@@ -10,10 +10,11 @@ import {
     SelectBoxVariable,
     SingleLineTextVariable,
 } from '@servicenow/sdk/core'
+import { BROAD_STAFF } from '../../server/domain/roles'
 import { afterReturnProduced } from '../../server/entry/returns'
 import { FLEET_INSTALLED, SITES_OF_CUSTOMER_QUERY } from '../../server/domain/fleet'
 import { SERVICE_CATALOG } from '../orders/forms.now'
-import { broadStaff, orderRaisers, providerStaff } from '../shared/roles.now'
+import { orderRaisers, providerStaff } from '../shared/roles.now'
 import { naasMenu } from '../shared/menu.now'
 
 Form({
@@ -228,7 +229,7 @@ Record({
         application: naasMenu,
         link_type: 'LIST',
         name: 'x_daas_ham_fee_event',
-        roles: broadStaff,
+        roles: BROAD_STAFF,
         active: true,
         order: 375,
     },

@@ -3,8 +3,7 @@ import { default_view, Form, List, Record } from '@servicenow/sdk/core'
 import { NAAS_MODEL_MILESTONES } from '../../server/domain/fleet'
 import { MODEL_LIFECYCLE } from '../../server/domain/model-lifecycle'
 import { OPEN_NORM_EXCEPTIONS_QUERY } from '../../server/domain/normalization'
-import { ROLE } from '../../server/domain/roles'
-import { broadStaff } from '../shared/roles.now'
+import { BROAD_STAFF, ROLE } from '../../server/domain/roles'
 import { naasMenu } from '../shared/menu.now'
 
 Form({
@@ -74,7 +73,7 @@ Record({
         link_type: 'LIST',
         name: MODEL_LIFECYCLE.table,
         filter: NAAS_MODEL_MILESTONES,
-        roles: broadStaff,
+        roles: BROAD_STAFF,
         active: true,
         order: 510,
     },
@@ -89,7 +88,7 @@ Record({
         link_type: 'FILTER',
         name: 'x_daas_ham_norm_exception',
         filter: OPEN_NORM_EXCEPTIONS_QUERY,
-        roles: broadStaff,
+        roles: BROAD_STAFF,
         active: true,
         order: 520,
     },

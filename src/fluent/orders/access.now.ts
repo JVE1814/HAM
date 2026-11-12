@@ -1,7 +1,8 @@
 import '@servicenow/sdk/global'
 import { Acl } from '@servicenow/sdk/core'
+import { CUSTOMER_CONTACTS } from '../../server/domain/roles'
 import { grantsCustomerRecord } from '../../server/entry/visibility'
-import { admin, assetManager, customerAdmin, customerRoles, orderRaisers, orderWorkers, providerStaff, serviceDesk } from '../shared/roles.now'
+import { admin, assetManager, customerAdmin, orderRaisers, orderWorkers, providerStaff, serviceDesk } from '../shared/roles.now'
 
 Acl({
     $id: Now.ID['acl_order_read_service_desk'],
@@ -32,7 +33,7 @@ Acl({
     type: 'record',
     table: 'x_daas_ham_order',
     operation: 'read',
-    roles: customerRoles,
+    roles: CUSTOMER_CONTACTS,
     script: grantsCustomerRecord,
 })
 
@@ -87,7 +88,7 @@ Acl({
     type: 'record',
     table: 'x_daas_ham_order_line',
     operation: 'read',
-    roles: customerRoles,
+    roles: CUSTOMER_CONTACTS,
     script: grantsCustomerRecord,
 })
 

@@ -1,7 +1,8 @@
 import '@servicenow/sdk/global'
 import { Acl } from '@servicenow/sdk/core'
+import { CUSTOMER_CONTACTS } from '../../server/domain/roles'
 import { deletesAsset, grantsFleetAsset, readsAssetCost, writesAsset, writesAssetCommercialField } from '../../server/entry/visibility'
-import { admin, assetManager, customerRoles, providerStaff } from '../shared/roles.now'
+import { admin, assetManager, providerStaff } from '../shared/roles.now'
 
 /*
  * Hardware is shared with the Provider's IT (ADR 0016), and the app's read ACLs for it sit on alm_asset, its parent
@@ -30,7 +31,7 @@ Acl({
     type: 'record',
     table: 'alm_asset',
     operation: 'read',
-    roles: customerRoles,
+    roles: CUSTOMER_CONTACTS,
     appliesTo: 'sys_class_name=alm_hardware',
     description: "NaaS Customer contacts read their Customer's fleet assets (site contacts: at the Sites listing them).",
     script: grantsFleetAsset,

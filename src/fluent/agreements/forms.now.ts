@@ -1,6 +1,6 @@
 import '@servicenow/sdk/global'
 import { default_view, Form, List, Record } from '@servicenow/sdk/core'
-import { broadStaff } from '../shared/roles.now'
+import { BROAD_STAFF } from '../../server/domain/roles'
 import { naasMenu } from '../shared/menu.now'
 
 Form({
@@ -193,7 +193,7 @@ Record({
         application: naasMenu,
         link_type: 'LIST',
         name: 'x_daas_ham_agreement',
-        roles: broadStaff,
+        roles: BROAD_STAFF,
         active: true,
         order: 410,
     },
@@ -207,7 +207,7 @@ Record({
         application: naasMenu,
         link_type: 'LIST',
         name: 'x_daas_ham_subscription_line',
-        roles: broadStaff,
+        roles: BROAD_STAFF,
         active: true,
         order: 420,
     },
@@ -221,7 +221,7 @@ Record({
         application: naasMenu,
         link_type: 'LIST',
         name: 'x_daas_ham_catalog_entry',
-        roles: broadStaff,
+        roles: BROAD_STAFF,
         active: true,
         order: 430,
     },
@@ -235,7 +235,7 @@ Record({
         application: naasMenu,
         link_type: 'LIST',
         name: 'x_daas_ham_site_template',
-        roles: broadStaff,
+        roles: BROAD_STAFF,
         active: true,
         order: 440,
     },

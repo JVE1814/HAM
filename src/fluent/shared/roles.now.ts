@@ -1,6 +1,6 @@
 import '@servicenow/sdk/global'
 import { Role } from '@servicenow/sdk/core'
-import { BROAD_STAFF, CUSTOMER_CONTACTS, EQUIPMENT_HANDLERS, MONEY_READERS, PLATFORM_ROLE, PROVIDER_STAFF, RACK_PAGE_USERS, ROLE } from '../../server/domain/roles'
+import { PLATFORM_ROLE, PROVIDER_STAFF, ROLE } from '../../server/domain/roles'
 
 /*
  * The base-platform roles contained below must exist on the instance, as must the service desk's, which the ACLs grant
@@ -76,17 +76,11 @@ export const integration = Role({
 /** Every provider-staff role: reads the installed base and the tables of stockroom work, the only app tables an inventory tech reads. */
 export const providerStaff = PROVIDER_STAFF
 
-/** Provider staff without inventory techs: the read list for customer, commercial and configuration tables. */
-export const broadStaff = BROAD_STAFF
-
 /**
  * The service desk (Customer Service agents, a platform role the ACLs name directly): raises Orders and Returns for any
  * Customer, so it reads the Agreements, Site templates, Orders and Returns that work needs, and no other NaaS table.
  */
 export const serviceDesk = [PLATFORM_ROLE.serviceDeskAgent]
-
-/** External customer roles; their reads are filtered to their own customer. */
-export const customerRoles = CUSTOMER_CONTACTS
 
 /** Who writes Agreements, Catalog entries and the other commercial records. */
 export const commercialEditors = [ROLE.accountManager, ROLE.assetManager]
@@ -111,9 +105,6 @@ export const attestationEditors = [ROLE.accountManager, ROLE.assetManager]
 /** Who does the stockroom's work: receiving, staging, shipping, blind counts. */
 export const stockroomWorkers = [ROLE.inventoryTech, ROLE.assetManager]
 
-/** Who scans equipment: the warehouse page, and Audits with their lines. */
-export const scanners = EQUIPMENT_HANDLERS
-
 /** Who sends equipment back: opens OEM RMAs and Return lines, buys and voids labels. */
 export const returnWorkers = [ROLE.assetManager, ROLE.inventoryTech, ROLE.noc]
 
@@ -125,12 +116,6 @@ export const feeEditors = [ROLE.assetManager, ROLE.finance]
 
 /** Who opens or closes a Service interval by hand, when a stage change could not. */
 export const intervalEditors = [ROLE.assetManager, ROLE.finance]
-
-/** Roles that read the money tables (service intervals, billing, cost facts and margin), the NaaS dashboard's Margin tab among them. */
-export const moneyReaders = MONEY_READERS
-
-/** Every person the app serves, provider staff and Customer contacts: the rack elevations are open to them all. */
-export const staffAndCustomers = RACK_PAGE_USERS
 
 /*
  * Three of the groups again as role records, for the workspace's audiences: an Applicability stores role ids, which a

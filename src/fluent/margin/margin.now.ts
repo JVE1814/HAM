@@ -14,11 +14,12 @@ import {
     Table,
     UiAction,
 } from '@servicenow/sdk/core'
+import { MONEY_READERS } from '../../server/domain/roles'
 import { BILLING_PERIOD_STATUS, COST_TYPE_CHOICES } from '../../server/domain/vocabulary'
 import { EVENT } from '../../server/domain/events'
 import { computeMargin, uiRecomputeMargin } from '../../server/entry/margin'
 import { PROPERTY } from '../../server/domain/properties'
-import { admin, finance, moneyReaders } from '../shared/roles.now'
+import { admin, finance } from '../shared/roles.now'
 
 export const x_daas_ham_cost_fact = Table({
     name: 'x_daas_ham_cost_fact',
@@ -120,7 +121,7 @@ Acl({
     type: 'record',
     table: 'x_daas_ham_cost_fact',
     operation: 'read',
-    roles: moneyReaders,
+    roles: MONEY_READERS,
 })
 
 Acl({
@@ -152,7 +153,7 @@ Acl({
     type: 'record',
     table: 'x_daas_ham_margin',
     operation: 'read',
-    roles: moneyReaders,
+    roles: MONEY_READERS,
 })
 
 Acl({

@@ -1,14 +1,15 @@
 import '@servicenow/sdk/global'
 import { Acl } from '@servicenow/sdk/core'
+import { BROAD_STAFF } from '../../server/domain/roles'
 import { grantsCustomerRecord } from '../../server/entry/visibility'
-import { broadStaff, commercialEditors, customerAdmin, serviceDesk } from '../shared/roles.now'
+import { commercialEditors, customerAdmin, serviceDesk } from '../shared/roles.now'
 
 Acl({
     $id: Now.ID['acl_agreement_read'],
     type: 'record',
     table: 'x_daas_ham_agreement',
     operation: 'read',
-    roles: broadStaff,
+    roles: BROAD_STAFF,
 })
 
 Acl({
@@ -40,7 +41,7 @@ Acl({
     type: 'record',
     table: 'x_daas_ham_agreement_quantity',
     operation: 'read',
-    roles: broadStaff,
+    roles: BROAD_STAFF,
 })
 
 Acl({
@@ -72,7 +73,7 @@ Acl({
     type: 'record',
     table: 'x_daas_ham_subscription_line',
     operation: 'read',
-    roles: broadStaff,
+    roles: BROAD_STAFF,
 })
 
 Acl({
@@ -104,7 +105,7 @@ Acl({
     type: 'record',
     table: 'x_daas_ham_catalog_entry',
     operation: 'read',
-    roles: broadStaff,
+    roles: BROAD_STAFF,
 })
 
 Acl({
@@ -136,7 +137,7 @@ Acl({
     type: 'record',
     table: 'x_daas_ham_site_template',
     operation: 'read',
-    roles: broadStaff,
+    roles: BROAD_STAFF,
 })
 
 Acl({
@@ -168,7 +169,7 @@ Acl({
     type: 'record',
     table: 'x_daas_ham_site_template_item',
     operation: 'read',
-    roles: broadStaff,
+    roles: BROAD_STAFF,
 })
 
 Acl({
