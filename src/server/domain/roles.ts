@@ -35,7 +35,7 @@ export const PLATFORM_ROLE = {
 
 /**
  * Provider staff without inventory techs: who reads the customer, commercial and configuration tables, and sees every
- * Customer. The metadata's read lists (shared/roles.now.ts `broadStaff`) are this list.
+ * Customer. The metadata's read lists are this list.
  */
 export const BROAD_STAFF = [ROLE.assetManager, ROLE.fieldTech, ROLE.noc, ROLE.accountManager, ROLE.finance]
 

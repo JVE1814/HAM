@@ -1,4 +1,5 @@
 import { GlideRecord } from '@servicenow/glide'
+import { JOB } from '../domain/chunked-job.ts'
 import { isStateChange, type DeviceEvent } from '../domain/device-events.ts'
 import { fleetStagesQuery } from '../domain/fleet.ts'
 import { decideInService, seenSourceOf } from '../domain/in-service.ts'
@@ -130,7 +131,7 @@ function applyCiSighting(assetId: string, readers: LifecycleReaders): boolean {
 export function detectPendingInService(): void {
     const readers = lifecycleReaders()
     runTableJob({
-        job: 'in_service_detection',
+        job: JOB.inServiceDetection,
         table: 'alm_hardware',
         query: fleetStagesQuery(['pending_in_service']),
         read: (asset) => asset.getUniqueValue(),

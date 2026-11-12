@@ -1,9 +1,10 @@
 import '@servicenow/sdk/global'
 import { Acl, BusinessRule, Property, Record, StringColumn, Table, UiPage } from '@servicenow/sdk/core'
+import { EQUIPMENT_HANDLERS } from '../../server/domain/roles'
 import { processAsnRow } from '../../server/entry/warehouse'
 import { PROPERTY } from '../../server/domain/properties'
 import warehousePage from '../../client/warehouse.html'
-import { admin, scanners, stockroomWorkers } from '../shared/roles.now'
+import { admin, stockroomWorkers } from '../shared/roles.now'
 import { naasMenu } from '../shared/menu.now'
 
 /*
@@ -100,7 +101,7 @@ Acl({
     type: 'ui_page',
     name: WAREHOUSE_PAGE,
     operation: 'read',
-    roles: scanners,
+    roles: EQUIPMENT_HANDLERS,
 })
 
 Record({
@@ -111,7 +112,7 @@ Record({
         application: naasMenu,
         link_type: 'DIRECT',
         query: `${WAREHOUSE_PAGE}.do`,
-        roles: scanners,
+        roles: EQUIPMENT_HANDLERS,
         active: true,
         order: 110,
     },

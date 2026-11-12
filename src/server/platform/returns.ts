@@ -1,4 +1,5 @@
 import { GlideRecord } from '@servicenow/glide'
+import { JOB } from '../domain/chunked-job.ts'
 import { messageOf } from '../domain/errors.ts'
 import { TRY_AGAIN, type HeldLock } from '../domain/job-lock.ts'
 import { checkTransition, isDeployed, type Stage } from '../domain/lifecycle.ts'
@@ -450,7 +451,7 @@ export function chaseOverdue(): void {
     const today = todayIso()
     const grace = intProperty(PROPERTY.returnGraceDays)
     runTableJob({
-        job: 'chase_overdue_returns',
+        job: JOB.chaseOverdueReturns,
         table: RETURN_LINE,
         query: `status=${AWAITED}^return_order.due_back<${today}`,
         read: (line) => ({

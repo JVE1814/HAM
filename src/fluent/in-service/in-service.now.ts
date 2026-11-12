@@ -13,13 +13,14 @@ import {
     StringColumn,
     Table,
 } from '@servicenow/sdk/core'
+import { BROAD_STAFF } from '../../server/domain/roles'
 import { DEVICE_EVENT_KIND_CHOICES, DEVICE_EVENT_SOURCE_CHOICES } from '../../server/domain/vocabulary'
 import { FLEET_CONDITION } from '../../server/domain/fleet'
 import { purgeDeviceEvents } from '../../server/entry/in-service'
 import { detectPendingInService } from '../../server/platform/in-service'
 import { PROPERTY } from '../../server/domain/properties'
 import { DEFAULT_DEVICE_EVENT_SOURCE, DEVICE_EVENT_SENDERS } from '../../server/domain/device-events'
-import { admin, broadStaff } from '../shared/roles.now'
+import { admin } from '../shared/roles.now'
 import { naasMenu } from '../shared/menu.now'
 
 export const x_daas_ham_device_event = Table({
@@ -93,7 +94,7 @@ Acl({
     type: 'record',
     table: 'x_daas_ham_device_event',
     operation: 'read',
-    roles: broadStaff,
+    roles: BROAD_STAFF,
 })
 
 Acl({
@@ -147,7 +148,7 @@ Record({
         application: naasMenu,
         link_type: 'LIST',
         name: 'x_daas_ham_device_event',
-        roles: broadStaff,
+        roles: BROAD_STAFF,
         active: true,
         order: 340,
     },

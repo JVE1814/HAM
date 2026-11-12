@@ -1,13 +1,14 @@
 import '@servicenow/sdk/global'
 import { Acl } from '@servicenow/sdk/core'
-import { admin, finance, intervalEditors, moneyReaders } from '../shared/roles.now'
+import { MONEY_READERS } from '../../server/domain/roles'
+import { admin, finance, intervalEditors } from '../shared/roles.now'
 
 Acl({
     $id: Now.ID['acl_service_interval_read'],
     type: 'record',
     table: 'x_daas_ham_service_interval',
     operation: 'read',
-    roles: moneyReaders,
+    roles: MONEY_READERS,
 })
 
 Acl({
@@ -39,7 +40,7 @@ Acl({
     type: 'record',
     table: 'x_daas_ham_billing_period',
     operation: 'read',
-    roles: moneyReaders,
+    roles: MONEY_READERS,
 })
 
 Acl({
@@ -71,7 +72,7 @@ Acl({
     type: 'record',
     table: 'x_daas_ham_billing_line',
     operation: 'read',
-    roles: moneyReaders,
+    roles: MONEY_READERS,
 })
 
 Acl({

@@ -1,7 +1,8 @@
 import '@servicenow/sdk/global'
 import { Acl } from '@servicenow/sdk/core'
+import { BROAD_STAFF, CUSTOMER_CONTACTS, EQUIPMENT_HANDLERS } from '../../server/domain/roles'
 import { grantsCustomerRecord } from '../../server/entry/visibility'
-import { admin, assetManager, attestationEditors, broadStaff, customerRoles, noc, providerStaff, scanners } from '../shared/roles.now'
+import { admin, assetManager, attestationEditors, noc, providerStaff } from '../shared/roles.now'
 
 Acl({
     $id: Now.ID['acl_audit_read'],
@@ -16,7 +17,7 @@ Acl({
     type: 'record',
     table: 'x_daas_ham_audit',
     operation: 'create',
-    roles: scanners,
+    roles: EQUIPMENT_HANDLERS,
 })
 
 Acl({
@@ -24,7 +25,7 @@ Acl({
     type: 'record',
     table: 'x_daas_ham_audit',
     operation: 'write',
-    roles: scanners,
+    roles: EQUIPMENT_HANDLERS,
 })
 
 Acl({
@@ -48,7 +49,7 @@ Acl({
     type: 'record',
     table: 'x_daas_ham_audit_line',
     operation: 'create',
-    roles: scanners,
+    roles: EQUIPMENT_HANDLERS,
 })
 
 Acl({
@@ -56,7 +57,7 @@ Acl({
     type: 'record',
     table: 'x_daas_ham_audit_line',
     operation: 'write',
-    roles: scanners,
+    roles: EQUIPMENT_HANDLERS,
 })
 
 Acl({
@@ -72,7 +73,7 @@ Acl({
     type: 'record',
     table: 'x_daas_ham_recon_exception',
     operation: 'read',
-    roles: broadStaff,
+    roles: BROAD_STAFF,
 })
 
 Acl({
@@ -104,7 +105,7 @@ Acl({
     type: 'record',
     table: 'x_daas_ham_attestation',
     operation: 'read',
-    roles: broadStaff,
+    roles: BROAD_STAFF,
 })
 
 Acl({
@@ -112,7 +113,7 @@ Acl({
     type: 'record',
     table: 'x_daas_ham_attestation',
     operation: 'read',
-    roles: customerRoles,
+    roles: CUSTOMER_CONTACTS,
     script: grantsCustomerRecord,
 })
 
@@ -145,7 +146,7 @@ Acl({
     type: 'record',
     table: 'x_daas_ham_attestation_item',
     operation: 'read',
-    roles: broadStaff,
+    roles: BROAD_STAFF,
 })
 
 Acl({
@@ -153,7 +154,7 @@ Acl({
     type: 'record',
     table: 'x_daas_ham_attestation_item',
     operation: 'read',
-    roles: customerRoles,
+    roles: CUSTOMER_CONTACTS,
     script: grantsCustomerRecord,
 })
 

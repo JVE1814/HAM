@@ -1,7 +1,7 @@
 import '@servicenow/sdk/global'
 import { ApplicationMenu, Record } from '@servicenow/sdk/core'
-import { ROLE } from '../../server/domain/roles'
-import { broadStaff, providerStaff, stockroomWorkers } from './roles.now'
+import { BROAD_STAFF, ROLE } from '../../server/domain/roles'
+import { providerStaff, stockroomWorkers } from './roles.now'
 import { WORKSPACE_HOME } from '../workspace/workspace.now'
 
 /*
@@ -65,7 +65,7 @@ Record({
         title: 'Commercial',
         application: naasMenu,
         link_type: 'SEPARATOR',
-        roles: broadStaff,
+        roles: BROAD_STAFF,
         active: true,
         order: 400,
     },
@@ -78,7 +78,7 @@ Record({
         title: 'Models',
         application: naasMenu,
         link_type: 'SEPARATOR',
-        roles: broadStaff,
+        roles: BROAD_STAFF,
         active: true,
         order: 500,
     },

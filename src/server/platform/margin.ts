@@ -1,6 +1,6 @@
 import { GlideAggregate, GlideRecord } from '@servicenow/glide'
 import { chooseCurrency, currencyCode, currencyKey, currencyOrThrow, monthBounds, overlapsMonth, roundToCent, timeInMonth, type AgreementCurrency, type MonthBounds } from '../domain/money.ts'
-import type { Failures } from '../domain/chunked-job.ts'
+import { JOB, type Failures } from '../domain/chunked-job.ts'
 import { messageOf } from '../domain/errors.ts'
 import { stillCovered } from '../domain/leases.ts'
 import {
@@ -57,7 +57,7 @@ function costServiceIntervals(period: GlideRecord, queued: JobEvent): void {
     const currencies = memoized(customerCurrencies)
     const lineAgreements = memoized(lineAgreementOf)
     runSupersedingChunk(queued, {
-        job: `margin_${periodId}`,
+        job: JOB.margin(periodId),
         onStart: () => {
             // The status first: if the period refuses it, the pass stops before its Margin is cleared.
             recordMarginOutcome(period, 0, '')

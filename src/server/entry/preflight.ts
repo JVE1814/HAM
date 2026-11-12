@@ -1,4 +1,5 @@
 import { GlideRecord } from '@servicenow/glide'
+import { JOB } from '../domain/chunked-job.ts'
 import { messageOf } from '../domain/errors.ts'
 import { preflightReport } from '../domain/preflight.ts'
 import { openJobCursor } from '../platform/job-cursor.ts'
@@ -22,7 +23,7 @@ export function runPreflight(): void {
 
 function recordResult(result: string): string | null {
     try {
-        return openJobCursor('preflight').save({ status: result, ranNow: true })
+        return openJobCursor(JOB.preflight).save({ status: result, ranNow: true })
     } catch (error) {
         return messageOf(error)
     }

@@ -1183,7 +1183,7 @@ recommended hardening are described in the notes of their area.
   stay as the documentation default. Add a string property `x_daas_ham.mist.api_host` (default
   `api.mist.com`, with the 12 documented hosts as choices) and substitute it in
   `platform/rest-messages.ts` with `gs.getProperty('x_daas_ham.mist.api_host', 'api.mist.com')`
-  through a non-secret mapping next to `SECRETS` (`platform/rest-messages.ts`). Confirm on an
+  through a non-secret mapping next to the `secrets` of `VARIABLES` (`platform/rest-messages.ts`). Confirm on an
   instance that RESTMessageV2 substitutes `${}` in the host part (fallback `rest.setEndpoint()`).
   With a single host property all configured Mist orgs must be on the same cloud; otherwise store
   the host per org.
@@ -1320,11 +1320,11 @@ recommended hardening are described in the notes of their area.
   wrapper, all 12 choices, and a `delete_multiple` that only matches those 12 (name, element, value,
   language, dependent_value) identities. Do not add the parent while `legacyChoices` is true: the v3
   output would wipe the out-of-box substatus choices. Requires Brazil, Australia P4+ or Zurich P11+.
-  Then add a check that the built XML contains every `ADDED_SUBSTATUSES` value.
+  Then add a check that the built XML contains the substatus of every `STAGE_FIELDS` entry with a `choice`.
 - **Substatus collisions (differs).** On the instance, query `sys_choice`
   `name=alm_asset^element=substatus^dependent_value=6`. If the out-of-box value is
-  `pending_evaluation`, delete it from `ADDED_SUBSTATUSES` (`domain/vocabulary.ts`) and its Record
-  (`fleet/tables.now.ts`); the `STAGE_FIELDS` mapping can stay. If the value differs, set
+  `pending_evaluation`, delete the `choice` of `STAGE_FIELDS.pending_evaluation` (`domain/vocabulary.ts`) and its Record
+  (`fleet/tables.now.ts`); the substatus mapping can stay. If the value differs, set
   `STAGE_FIELDS.pending_evaluation.substatus` (`domain/vocabulary.ts`) to it and drop the added
   choice. Optional: map `returned_to_lessor` (`domain/vocabulary.ts`) to the out-of-box "Lease
   return" value once that value is confirmed. **Done (Brazil instance, 2026-11-09):** `sys_choice`

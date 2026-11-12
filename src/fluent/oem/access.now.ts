@@ -1,13 +1,14 @@
 import '@servicenow/sdk/global'
 import { Acl } from '@servicenow/sdk/core'
-import { admin, assetManager, broadStaff } from '../shared/roles.now'
+import { BROAD_STAFF } from '../../server/domain/roles'
+import { admin, assetManager } from '../shared/roles.now'
 
 Acl({
     $id: Now.ID['acl_oem_coverage_read'],
     type: 'record',
     table: 'x_daas_ham_oem_coverage',
     operation: 'read',
-    roles: broadStaff,
+    roles: BROAD_STAFF,
 })
 
 Acl({
@@ -39,7 +40,7 @@ Acl({
     type: 'record',
     table: 'x_daas_ham_coverage_import',
     operation: 'read',
-    roles: broadStaff,
+    roles: BROAD_STAFF,
 })
 
 Acl({
@@ -71,7 +72,7 @@ Acl({
     type: 'record',
     table: 'x_daas_ham_cloud_account',
     operation: 'read',
-    roles: broadStaff,
+    roles: BROAD_STAFF,
 })
 
 Acl({

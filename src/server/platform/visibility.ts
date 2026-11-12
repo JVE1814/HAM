@@ -1,8 +1,9 @@
-import { GlideRecord, GlideTableHierarchy, gs } from '@servicenow/glide'
+import { GlideRecord, GlideTableHierarchy } from '@servicenow/glide'
 import { andEachClause } from '../domain/encoded-query.ts'
 import { memoized } from '../domain/memo.ts'
 import { SCOPED_TABLES, scopingOf, visibilityFilter, type ScopedRow, type ScopedTable, type TableScoping } from '../domain/visibility.ts'
 import { beyondVisibility } from './beyond-visibility.ts'
+import { log } from './log.ts'
 import { str } from './records.ts'
 import { currentSession } from './session.ts'
 
@@ -57,7 +58,7 @@ export const placementOf = memoized((table: string): Placement => {
 })
 
 const warnUnplaced = memoized((table: string) => {
-    gs.warn(`NaaS visibility: ${table} is no scoped table and extends none, so it shows a reader the rules narrow nothing`)
+    log.warn(`NaaS visibility: ${table} is no scoped table and extends none, so it shows a reader the rules narrow nothing`)
     return true
 })
 

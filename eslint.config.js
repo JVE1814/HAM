@@ -13,6 +13,12 @@ const EXTENSIONLESS = {
     message: 'Name the .ts file: the instance resolves a server module import by its exact path.',
 }
 
+/** The build installs a server module that imports JSON with an import the instance cannot resolve, and every check passes. */
+const JSON_IMPORT = {
+    regex: '\\.json$',
+    message: 'A server module cannot import JSON: the instance cannot resolve it. Write the value out.',
+}
+
 const SERVER_FILES = 'src/server/**/*.{ts,tsx,mts,cts,js,mjs,cjs}'
 
 /** Test code: what the build leaves out of the server modules, so the layer rules do not apply to it. */
@@ -59,6 +65,17 @@ export default tseslint.config(
         ignores: TEST_CODE,
         rules: { 'no-restricted-syntax': ['error', STATIC_IMPORTS] },
     },
+    // An administrator picks the app's lines out of the system log by the scope that platform/log leads each with.
+    {
+        files: [SERVER_FILES],
+        ignores: [...TEST_CODE, 'src/server/platform/log.ts'],
+        rules: {
+            'no-restricted-properties': [
+                'error',
+                ...['info', 'warn', 'error'].map((property) => ({ object: 'gs', property, message: 'Log through platform/log, which leads the line with the scope.' })),
+            ],
+        },
+    },
     // A save without the business rules gets past the closed Billing period's lock, so it is made in one module.
     {
         files: ['src/server/{domain,platform,entry}/**/*.ts'],
@@ -93,6 +110,7 @@ export default tseslint.config(
                 'error',
                 {
                     patterns: [
+                        JSON_IMPORT,
                         EXTENSIONLESS,
                         { regex: '^@servicenow/glide', message: 'The domain core never imports Glide (ADR 0003).' },
                         { regex: '/(platform|entry)/', message: 'The domain core imports nothing above it (ADR 0003).' },
@@ -107,7 +125,7 @@ export default tseslint.config(
         rules: {
             'no-restricted-imports': [
                 'error',
-                { patterns: [EXTENSIONLESS, { regex: '/entry/', message: 'Platform never imports entry points (ADR 0003).' }] },
+                { patterns: [JSON_IMPORT, EXTENSIONLESS, { regex: '/entry/', message: 'Platform never imports entry points (ADR 0003).' }] },
             ],
         },
     },
@@ -120,6 +138,7 @@ export default tseslint.config(
                 'error',
                 {
                     patterns: [
+                        JSON_IMPORT,
                         EXTENSIONLESS,
                         {
                             regex: '^\\./|/entry/',

@@ -1,5 +1,6 @@
 import '@servicenow/sdk/global'
 import { Acl, RestApi } from '@servicenow/sdk/core'
+import { CUSTOMER_CONTACTS } from '../../server/domain/roles'
 import { postDeviceEvents } from '../../server/entry/in-service'
 import { listStockrooms, lookupAsset, pickAsset, putAwayAsset, receiveAsset } from '../../server/entry/warehouse'
 import { scanAudit } from '../../server/entry/assurance'
@@ -8,7 +9,6 @@ import { answerAttestation, confirmInstalled, customerOverview, reportFault, req
 import { getBillingLines, listBillingPeriods } from '../../server/entry/billing'
 import { PULL_PAGE } from '../../server/domain/billing'
 import { postTrackingUpdate } from '../../server/entry/shipping'
-import { customerRoles } from './roles.now'
 
 /*
  * A route that sets nothing requires the snc_internal role and enforces the platform's "Scripted REST External
@@ -25,7 +25,7 @@ const customerRestAcl = Acl({
     type: 'rest_endpoint',
     name: 'x_daas_ham NaaS customer routes',
     operation: 'execute',
-    roles: customerRoles,
+    roles: CUSTOMER_CONTACTS,
     description: "Admits customer admins and site contacts to the NaaS API's customer, site and rack routes; the handlers check the role and the Customer.",
 })
 

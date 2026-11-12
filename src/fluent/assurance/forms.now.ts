@@ -1,7 +1,8 @@
 import '@servicenow/sdk/global'
 import { default_view, Form, List, Record } from '@servicenow/sdk/core'
+import { BROAD_STAFF } from '../../server/domain/roles'
 import { OPEN_EXCEPTIONS_QUERY } from '../../server/domain/reconciliation'
-import { broadStaff, providerStaff } from '../shared/roles.now'
+import { providerStaff } from '../shared/roles.now'
 import { naasMenu } from '../shared/menu.now'
 
 Form({
@@ -147,7 +148,7 @@ Record({
         application: naasMenu,
         link_type: 'LIST',
         name: 'x_daas_ham_attestation',
-        roles: broadStaff,
+        roles: BROAD_STAFF,
         active: true,
         order: 384,
     },
@@ -162,7 +163,7 @@ Record({
         link_type: 'FILTER',
         name: 'x_daas_ham_recon_exception',
         filter: OPEN_EXCEPTIONS_QUERY,
-        roles: broadStaff,
+        roles: BROAD_STAFF,
         active: true,
         order: 386,
     },

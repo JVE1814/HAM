@@ -32,12 +32,12 @@ export function queueSourcing(orderId: string): void {
     if (order) fire(EVENT.sourceOrder, order)
 }
 
-/** Queue a sourcing pass of `order` again a minute later, unless it was already queued again `tries` times (false). */
+/** Queue a sourcing pass of `order` again `REQUEUE.delaySeconds` later, unless already queued again `tries` times (false). */
 export function queuePassAgain(order: GlideRecord, tries: number): boolean {
     return requeueCounted(EVENT.sourceOrder, order, '', tries)
 }
 
-/** Queue the submission of `order` again a minute later, unless it was already queued again `tries` times (false). */
+/** Queue the submission of `order` again `REQUEUE.delaySeconds` later, unless already queued again `tries` times (false). */
 export function queueSubmissionAgain(order: GlideRecord, tries: number): boolean {
     return requeueCounted(EVENT.sourceOrder, order, SUBMIT_AGAIN, tries)
 }

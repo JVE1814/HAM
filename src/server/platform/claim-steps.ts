@@ -1,4 +1,5 @@
 import { GlideRecord } from '@servicenow/glide'
+import { JOB } from '../domain/chunked-job.ts'
 import type { HeldLock } from '../domain/job-lock.ts'
 import { LOCK } from '../domain/lock-names.ts'
 import { enabledClaims } from '../domain/oem/adapters.ts'
@@ -119,8 +120,6 @@ export function releaseStepsWaitingOn(taskId: string, action: string): void {
 /** Waiting steps a claim run checks for a prerequisite no longer open, at most. */
 const STRANDED_LOAD = 200
 
-const STRANDED_CURSOR = 'oem_claim_stranded'
-
 /**
  * Release the waiting steps whose staging task (still active) has no open step of their prerequisite action
  * (CLAIM_PREREQUISITE) left to wait on: its release was refused when it was ticked done (logged), or it is gone. A
@@ -167,9 +166,9 @@ function waitingSteps(after: string): Array<{ stepId: string; taskId: string; pr
 
 function strandedCursor(): JobCursor | null {
     try {
-        return openJobCursor(STRANDED_CURSOR)
+        return openJobCursor(JOB.oemClaimStranded)
     } catch (error) {
-        log.warn(`Job cursor ${STRANDED_CURSOR} not created, so each claim run checks the same waiting steps: ${messageOf(error)}`)
+        log.warn(`Job cursor ${JOB.oemClaimStranded} not created, so each claim run checks the same waiting steps: ${messageOf(error)}`)
         return null
     }
 }
@@ -177,7 +176,7 @@ function strandedCursor(): JobCursor | null {
 function saveStrandedCursor(cursor: JobCursor, next: string): void {
     if (cursor.cursor === next) return
     const refused = cursor.save({ cursor: next })
-    if (refused) log.warn(`Job cursor ${STRANDED_CURSOR} not saved, so the next claim run checks the same waiting steps: ${refused}`)
+    if (refused) log.warn(`Job cursor ${JOB.oemClaimStranded} not saved, so the next claim run checks the same waiting steps: ${refused}`)
 }
 
 /**

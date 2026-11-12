@@ -47,10 +47,10 @@ const AGAIN_BECAUSE: Record<Exclude<LineSourcing, 'done'>, string> = {
 /**
  * Two passes over one Order (two staging tasks failed seconds apart, or one failed while the first pass runs) would
  * count the same shortfall, and one would buy what the other claimed. So a pass holds a lock on the Order, which Cancel
- * order holds too (platform/orders `cancelOrder`). One that finds it held runs again a minute later rather than leave
- * its work to the holder, which may have counted before the change that queued it; so does a pass that left a line
- * whose lock stayed held, or that lost the Order's lock. A request is queued again a minute apart and past the lock's
- * abandonment (domain/job-lock `REQUEUE`), then dropped with a warning: a lock still held by then was taken after the
+ * order holds too (platform/orders `cancelOrder`). One that finds it held runs again later rather than leave its work
+ * to the holder, which may have counted before the change that queued it; so does a pass that left a line whose lock
+ * stayed held, or that lost the Order's lock. A request is queued again `REQUEUE.delaySeconds` apart and past the
+ * lock's abandonment (domain/job-lock), then dropped with a warning: a lock still held by then was taken after the
  * request was queued, by a pass that counted its change. Taking the lock throws only when an insert is refused with no
  * lock row (platform/locks): that error escapes.
  */

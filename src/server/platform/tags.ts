@@ -1,4 +1,5 @@
 import { GlideRecord } from '@servicenow/glide'
+import { JOB } from '../domain/chunked-job.ts'
 import { TRY_AGAIN, type HeldLock } from '../domain/job-lock.ts'
 import { LOCK } from '../domain/lock-names.ts'
 import { PROPERTY } from '../domain/properties.ts'
@@ -6,8 +7,6 @@ import { formatProviderTag, nextFreeSequence } from '../domain/provider-tag.ts'
 import { openJobCursor } from './job-cursor.ts'
 import { withLockTries } from './locks.ts'
 import { intProperty, stringProperty } from './properties.ts'
-
-const SEQUENCE_JOB = 'provider_tag_sequence'
 
 /**
  * The next Provider tag, or null while other receipts held the counter through every try (a holder keeps it for one
@@ -38,7 +37,7 @@ export function nextProviderTag(): string | null {
  */
 function advanceCounter(lock: HeldLock, taken: (sequence: number) => boolean): number | null {
     // Its first row is created empty, which reads as no number issued, as no row does.
-    const counter = openJobCursor(SEQUENCE_JOB)
+    const counter = openJobCursor(JOB.providerTagSequence)
     const next = nextFreeSequence(parseInt(counter.cursor, 10) || 0, taken)
     const saved = lock.write(() => {
         const refused = counter.save({ cursor: String(next) })

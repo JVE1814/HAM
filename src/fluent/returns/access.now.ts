@@ -1,19 +1,8 @@
 import '@servicenow/sdk/global'
 import { Acl } from '@servicenow/sdk/core'
+import { BROAD_STAFF, CUSTOMER_CONTACTS } from '../../server/domain/roles'
 import { createsCustomerReturn, grantsCustomerRecord } from '../../server/entry/visibility'
-import {
-    admin,
-    broadStaff,
-    customerAdmin,
-    customerRoles,
-    feeEditors,
-    orderRaisers,
-    providerStaff,
-    returnEditors,
-    returnWorkers,
-    serviceDesk,
-    stockroomWorkers,
-} from '../shared/roles.now'
+import { admin, customerAdmin, feeEditors, orderRaisers, providerStaff, returnEditors, returnWorkers, serviceDesk, stockroomWorkers } from '../shared/roles.now'
 
 Acl({
     $id: Now.ID['acl_return_order_read_service_desk'],
@@ -44,7 +33,7 @@ Acl({
     type: 'record',
     table: 'x_daas_ham_return_order',
     operation: 'read',
-    roles: customerRoles,
+    roles: CUSTOMER_CONTACTS,
     script: grantsCustomerRecord,
 })
 
@@ -53,7 +42,7 @@ Acl({
     type: 'record',
     table: 'x_daas_ham_fee_event',
     operation: 'read',
-    roles: broadStaff,
+    roles: BROAD_STAFF,
 })
 
 Acl({
@@ -118,7 +107,7 @@ Acl({
     type: 'record',
     table: 'x_daas_ham_return_order_line',
     operation: 'read',
-    roles: customerRoles,
+    roles: CUSTOMER_CONTACTS,
     script: grantsCustomerRecord,
 })
 

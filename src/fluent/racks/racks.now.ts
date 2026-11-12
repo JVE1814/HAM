@@ -1,12 +1,13 @@
 import '@servicenow/sdk/global'
 import { Acl, BusinessRule, Record, UiPage } from '@servicenow/sdk/core'
+import { RACK_PAGE_USERS } from '../../server/domain/roles'
 import { PLACEMENT_FIELDS } from '../../server/domain/rack'
 import { explainRackRefusal } from '../../server/entry/racks'
 import { recheckRacksOf } from '../../server/platform/racks'
 import { CURRENT_IS_FLEET, CURRENT_IS_FLEET_UNSPACED, FLEET_FIELD } from '../../server/domain/fleet'
 import rackPage from '../../client/rack.html'
 import { ENTRY_MODULES } from '../shared/server-modules.now'
-import { providerStaff, staffAndCustomers } from '../shared/roles.now'
+import { providerStaff } from '../shared/roles.now'
 import { naasMenu } from '../shared/menu.now'
 
 /** Written without spaces, as the rack rules' conditions are. */
@@ -83,7 +84,7 @@ Acl({
     type: 'ui_page',
     name: RACKS_PAGE,
     operation: 'read',
-    roles: staffAndCustomers,
+    roles: RACK_PAGE_USERS,
 })
 
 Record({

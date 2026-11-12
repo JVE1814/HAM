@@ -1,4 +1,5 @@
 import { GlideRecord } from '@servicenow/glide'
+import { JOB } from '../domain/chunked-job.ts'
 import { fleetStagesQuery } from '../domain/fleet.ts'
 import {
     CI_SITE_LOCATIONS,
@@ -27,7 +28,7 @@ export function reconcileInstalledBase(): void {
     const unseenDays = intProperty(PROPERTY.unseenDays)
     const now = nowMs()
     runTableJob({
-        job: 'reconcile_installed_base',
+        job: JOB.reconcileInstalledBase,
         table: 'alm_hardware',
         query: fleetStagesQuery(IN_USE_STAGES),
         read: (asset) => ({

@@ -1,6 +1,6 @@
 import '@servicenow/sdk/global'
 import { Test } from '@servicenow/sdk/core'
-import { DEVICE_CLASS, INSTALL_STATUS, STAGE_FIELDS, STOCKROOM_TYPE } from '../../server/domain/vocabulary'
+import { DEVICE_CLASS, INSTALL_STATUS, LEGAL_OWNER, STAGE_FIELDS, STOCKROOM_TYPE } from '../../server/domain/vocabulary'
 import { assetManager } from '../shared/roles.now'
 
 /*
@@ -13,6 +13,8 @@ const IN_STOCK = INSTALL_STATUS.inStock
 const AVAILABLE = STAGE_FIELDS.available.substatus
 const CENTRAL_DEPOT = STOCKROOM_TYPE.central_depot
 const SWITCH = DEVICE_CLASS.switch
+const REFUSED_FIELDS = `x_daas_ham_fleet=false^install_status=${STAGE_FIELDS.available.installStatus}^substatus=${STAGE_FIELDS.available.substatus}`
+const ADOPTED_FIELDS = `x_daas_ham_fleet=true^x_daas_ham_legal_owner=${LEGAL_OWNER.provider}^install_status=${STAGE_FIELDS.available.installStatus}^substatus=${STAGE_FIELDS.available.substatus}`
 
 export const addToFleetTest = Test(
     {
@@ -94,7 +96,7 @@ export const addToFleetTest = Test(
             $id: Now.ID['atf_adopt_validate_refused'],
             table: 'alm_hardware',
             recordId: refused.record_id,
-            fieldValues: 'x_daas_ham_fleet=false^install_status=6^substatus=available',
+            fieldValues: REFUSED_FIELDS,
             assert: 'record_validated',
         })
         // The control: the action adopts a unit of a NaaS Model, so the refusal above is the OEM PID's.
@@ -109,7 +111,7 @@ export const addToFleetTest = Test(
             $id: Now.ID['atf_adopt_validate_adopted'],
             table: 'alm_hardware',
             recordId: adopted.record_id,
-            fieldValues: 'x_daas_ham_fleet=true^x_daas_ham_legal_owner=provider^install_status=6^substatus=available',
+            fieldValues: ADOPTED_FIELDS,
             assert: 'record_validated',
         })
     },

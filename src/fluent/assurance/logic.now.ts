@@ -1,10 +1,11 @@
 import '@servicenow/sdk/global'
 import { Property, ScheduledScript, UiAction } from '@servicenow/sdk/core'
+import { EQUIPMENT_HANDLERS } from '../../server/domain/roles'
 import { reconcileInstalledBaseAndRacks, uiCloseAudit, uiStartSiteAudit, uiStartStockroomAudit } from '../../server/entry/assurance'
 import { raiseDueAttestations } from '../../server/platform/attestations'
 import { CURRENT_IS_NAAS_STOCKROOM, CURRENT_IS_SITE } from '../../server/domain/fleet'
 import { PROPERTY } from '../../server/domain/properties'
-import { admin, assetManager, fieldTech, scanners, stockroomWorkers } from '../shared/roles.now'
+import { admin, assetManager, fieldTech, stockroomWorkers } from '../shared/roles.now'
 
 // Offered on NaaS stockrooms only, those with a NaaS stockroom type: one with none is the Provider IT's storeroom
 // (ADR 0016).
@@ -39,7 +40,7 @@ UiAction({
     actionName: 'x_daas_ham_close_audit',
     hint: 'Compare the scans with the expected assets; missing assets become reconciliation exceptions.',
     condition: 'current.active == true',
-    roles: scanners,
+    roles: EQUIPMENT_HANDLERS,
     form: { showButton: true, style: 'primary' },
     showUpdate: true,
     script: uiCloseAudit,

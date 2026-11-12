@@ -1,4 +1,5 @@
 import { GlideAggregate, GlideRecord } from '@servicenow/glide'
+import { JOB } from '../domain/chunked-job.ts'
 import { andEachClause } from '../domain/encoded-query.ts'
 import { fleetStagesQuery } from '../domain/fleet.ts'
 import type { HeldLock } from '../domain/job-lock.ts'
@@ -38,7 +39,7 @@ const POOL_AGREEMENTS = `${ACTIVE_AGREEMENTS}^spare_pool_ratio>0`
 export function runSparePoolTopUp(): void {
     const autoPurchase = sparePurchasesEnabled()
     runTableJob({
-        job: 'spare_pool_top_up',
+        job: JOB.sparePoolTopUp,
         table: 'x_daas_ham_agreement',
         query: POOL_AGREEMENTS,
         read: (agreement) => str(agreement, 'customer'),

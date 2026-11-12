@@ -1,7 +1,8 @@
 import '@servicenow/sdk/global'
 import { Acl } from '@servicenow/sdk/core'
+import { CUSTOMER_CONTACTS } from '../../server/domain/roles'
 import { grantsCustomerRecord } from '../../server/entry/visibility'
-import { admin, customerRoles, providerStaff, stockroomWorkers } from '../shared/roles.now'
+import { admin, providerStaff, stockroomWorkers } from '../shared/roles.now'
 
 /*
  * Customer admins see their own Customer's shipments, site contacts those of
@@ -45,7 +46,7 @@ Acl({
     type: 'record',
     table: 'x_daas_ham_shipment',
     operation: 'read',
-    roles: customerRoles,
+    roles: CUSTOMER_CONTACTS,
     script: grantsCustomerRecord,
 })
 
@@ -100,6 +101,6 @@ Acl({
     type: 'record',
     table: 'x_daas_ham_shipment_event',
     operation: 'read',
-    roles: customerRoles,
+    roles: CUSTOMER_CONTACTS,
     script: grantsCustomerRecord,
 })
