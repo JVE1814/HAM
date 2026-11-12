@@ -59,7 +59,7 @@ export interface ClosingAsset {
     stage: Stage | null
     /** Its Order line; '' for none. */
     lineId: string
-    /** Whether that line still waits to be filled (domain/sourcing `lineStillOpen`). */
+    /** Whether that line still waits to be filled (domain/fulfilment `lineStillOpen`). */
     lineOpen: boolean
 }
 

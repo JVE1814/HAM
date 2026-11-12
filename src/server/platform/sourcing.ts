@@ -2,11 +2,11 @@ import { GlideRecord } from '@servicenow/glide'
 import { appendTo } from '../domain/collections.ts'
 import { REQUEUE, type HeldLock } from '../domain/job-lock.ts'
 import { LOCK } from '../domain/lock-names.ts'
+import { lineStillOpen } from '../domain/fulfilment.ts'
 import { advanceReplacementRma } from '../domain/oem-rma.ts'
 import {
     lineShortfall,
     LINES_TO_SOURCE,
-    lineStillOpen,
     needsTransfer,
     planSourcing,
     shortfallOutcome,
@@ -189,7 +189,7 @@ function shortfallOf(line: GlideRecord, allocated: number): number {
 }
 
 /**
- * The line read afresh while it and its Order are still open (domain/sourcing `lineStillOpen`), else null. Cancel
+ * The line read afresh while it and its Order are still open (domain/fulfilment `lineStillOpen`), else null. Cancel
  * order takes turns with sourcing under the Order's lock, but a rejected Order's lines are cancelled without that lock,
  * a cancel may overlap a pass that outlasted it (ADR 0013), and a line whose cancel was refused stays open on its
  * cancelled Order; so sourcing checks the line here before it reserves, buys or saves. The Order is saved as cancelled

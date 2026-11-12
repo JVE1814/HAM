@@ -1,7 +1,7 @@
 import { GlideRecord } from '@servicenow/glide'
 import { claimRouted } from '../domain/oem/adapters.ts'
 import { initialAutomationStatus } from '../domain/oem/claims.ts'
-import { lineStillOpen } from '../domain/sourcing.ts'
+import { lineStillOpen } from '../domain/fulfilment.ts'
 import {
     closureMoveProblem,
     DEFAULT_STAGING_SOURCE,

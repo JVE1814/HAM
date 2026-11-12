@@ -1,7 +1,7 @@
 import { GlideRecord } from '@servicenow/glide'
 import { addDays } from '../domain/calendar.ts'
 import { RMA_AT_OEM, RMA_AWAITED, RMA_OPEN, type OpenRma, type RmaReuse } from '../domain/oem-rma.ts'
-import { lineStillOpen } from '../domain/sourcing.ts'
+import { lineStillOpen } from '../domain/fulfilment.ts'
 import { LINE_STAGE, type OemVendor, RMA_STATE, type RmaState } from '../domain/vocabulary.ts'
 import { isFleetAsset, moveRefusal } from './assets.ts'
 import { nowGlide, todayIso } from './clock.ts'

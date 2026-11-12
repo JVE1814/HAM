@@ -1,4 +1,3 @@
-import { endedUnfulfilled, OPEN_LINE_STAGES, type LineOpenness } from './fulfilment.ts'
 import { byCandidateOrder, sourceQuery, type Source, type StockCandidate, type StockScope } from './stock.ts'
 import { LINE_STAGE, type LineStage, type OrderType } from './vocabulary.ts'
 
@@ -184,8 +183,3 @@ function routedOutcome(route: ShortfallRoute, line: { planSummary: string; missi
 
 /** The stages of the lines a sourcing pass sources: not sourced yet, or short of stock again. */
 export const LINES_TO_SOURCE: readonly LineStage[] = [LINE_STAGE.new, LINE_STAGE.awaiting_stock]
-
-/** Whether an Order line still waits to be filled: not shipped or cancelled, its Order not cancelled or rejected. */
-export function lineStillOpen(line: LineOpenness): boolean {
-    return OPEN_LINE_STAGES.includes(line.lineStage as LineStage) && !endedUnfulfilled(line.orderStage)
-}

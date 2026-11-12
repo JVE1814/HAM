@@ -26,7 +26,7 @@ export interface OpenRma {
     state: RmaState
     /** The Order line it serves; '' for none. */
     lineId: string
-    /** Whether that line still waits to be filled (domain/sourcing `lineStillOpen`); false for none. */
+    /** Whether that line still waits to be filled (domain/fulfilment `lineStillOpen`); false for none. */
     lineOpen: boolean
 }
 

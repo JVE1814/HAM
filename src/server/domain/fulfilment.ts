@@ -177,6 +177,11 @@ export interface LineOpenness {
     orderStage: string
 }
 
+/** Whether an Order line still waits to be filled: not shipped or cancelled, its Order not cancelled or rejected. */
+export function lineStillOpen(line: LineOpenness): boolean {
+    return OPEN_LINE_STAGES.includes(line.lineStage as LineStage) && !endedUnfulfilled(line.orderStage)
+}
+
 /** Stages in which an Order has ended, fulfilled or not. Every other Order is open (`OPEN_ORDERS_QUERY`). */
 export const ENDED_ORDER_STAGES: readonly OrderStage[] = [ORDER_STAGE.complete, ORDER_STAGE.cancelled, ORDER_STAGE.rejected]
 

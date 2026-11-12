@@ -3,10 +3,12 @@ import {
     anythingShipped,
     CANCELLABLE_ORDER_STAGES,
     closedStateFor,
+    endedUnfulfilled,
     ENDED_ORDER_STAGES,
     followsLines,
     leftInTransit,
     lineStageFor,
+    lineStillOpen,
     OPEN_ORDERS_QUERY,
     orderStageFor,
     refillsLine,
@@ -255,5 +257,35 @@ describe('the Order line stages', () => {
     it('have a line filled again from awaiting stock to shipped', () => {
         const refilled = (Object.keys(LINE_STAGE_CHOICES) as LineStage[]).filter((stage) => refillsLine({ stage, deploymentEnds: false }))
         expect(refilled).toEqual(['awaiting_stock', 'sourced', 'staging', 'ready_to_ship', 'shipped'])
+    })
+})
+
+describe('endedUnfulfilled', () => {
+    it('is an Order cancelled or rejected, and no other', () => {
+        expect(['cancelled', 'rejected'].map(endedUnfulfilled)).toEqual([true, true])
+        const live = ['draft', 'awaiting_approval', 'sourcing', 'preparing', 'delivering', 'installing', 'complete', '']
+        expect(live.filter(endedUnfulfilled)).toEqual([])
+    })
+
+    it('ends every line of the Order for sourcing, whatever its own stage', () => {
+        for (const orderStage of ['cancelled', 'rejected']) {
+            for (const lineStage of ['new', 'awaiting_stock', 'sourced', 'staging', 'ready_to_ship']) {
+                expect(lineStillOpen({ lineStage, orderStage })).toBe(false)
+            }
+        }
+    })
+})
+
+describe('lineStillOpen', () => {
+    it('is a line not yet shipped, cancelled or rejected, on an Order neither cancelled nor rejected', () => {
+        expect(lineStillOpen({ lineStage: 'awaiting_stock', orderStage: 'sourcing' })).toBe(true)
+        expect(lineStillOpen({ lineStage: 'ready_to_ship', orderStage: 'preparing' })).toBe(true)
+        for (const lineStage of ['shipped', 'installed', 'in_service', 'cancelled']) {
+            expect(lineStillOpen({ lineStage, orderStage: 'sourcing' })).toBe(false)
+        }
+        // A line whose cancel was refused stays open on its cancelled Order.
+        for (const orderStage of ['cancelled', 'rejected']) {
+            expect(lineStillOpen({ lineStage: 'awaiting_stock', orderStage })).toBe(false)
+        }
     })
 })
