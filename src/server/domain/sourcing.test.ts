@@ -44,16 +44,15 @@ describe('planSourcing', () => {
             { assetId: 'central-2', source: 'central_stock' },
             { assetId: 'staging-1', source: 'central_stock' },
         ])
-        expect(plan.toPurchase).toBe(1)
     })
 
-    it('serves replacements from the hot spare at the customer site first', () => {
+    it('serves replacements from the hot spare at the customer site first, buying none once stock covers them', () => {
         const plan = planSourcing(acme({ modelId: 'c9300', quantity: 2, purpose: 'replace' }), stock)
         expect(plan.picks).toEqual([
             { assetId: 'site-1', source: 'customer_site_stock' },
             { assetId: 'pool-1', source: 'spare_pool' },
         ])
-        expect(plan.toPurchase).toBe(0)
+        expect(plan.summary).toBe('1 from site stock, 1 from spare pool')
     })
 
     it('leaves a hot spare where it is for a new install: site stock serves replacements only', () => {

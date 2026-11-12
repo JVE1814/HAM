@@ -14,7 +14,6 @@ export interface SourcingRequest extends StockScope {
 
 export interface SourcingPlan {
     picks: Array<{ assetId: string; source: Source }>
-    toPurchase: number
     summary: string
 }
 
@@ -106,8 +105,9 @@ const LABEL: Record<Source, string> = {
 }
 
 /**
- * Which stock serves `request`, in its Sources' priority order, and how many units are left to purchase. A quantity
- * below one, or not a whole number of units, wants no more than its whole part: none takes no stock and buys nothing.
+ * Which stock serves `request`, in its Sources' priority order, summarised with how many units are left to purchase
+ * (the pass works out what it buys itself, as a pick may fail to reserve). A quantity below one, or not a whole number
+ * of units, wants no more than its whole part: none takes no stock and buys nothing.
  */
 export function planSourcing(request: SourcingRequest, stock: readonly StockCandidate[]): SourcingPlan {
     const wanted = Number.isFinite(request.quantity) ? Math.max(0, Math.floor(request.quantity)) : 0
@@ -126,7 +126,7 @@ export function planSourcing(request: SourcingRequest, stock: readonly StockCand
         .filter(([count]) => count > 0)
         .map(([count, label]) => `${count} ${label}`)
     if (toPurchase > 0) parts.push(`${toPurchase} to purchase`)
-    return { picks, toPurchase, summary: parts.join(', ') }
+    return { picks, summary: parts.join(', ') }
 }
 
 export type PurchaseResult = { ok: true; poId: string } | { ok: false; reason: string }
