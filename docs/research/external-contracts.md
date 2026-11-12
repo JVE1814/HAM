@@ -775,6 +775,7 @@ Sources:
 | A row inserted into an import-set table outside an import set | The app processes its import rows by business rule and ships no transform map (ADR 0018); an ATF test that inserts such a row does not fail on server errors and checks the outcome (`src/fluent/models/tests.now.ts`) | The platform transforms the row at once and, where the table has no transform map, logs the error *Transform map record not provided, transform stopped*; the insert is written and the app's rule runs | matches | N43 |
 | `gs.getPropertySecured` and a password2 property's read roles | Every secret is read with `gs.getProperty` (`platform/properties.ts` secretProperty), not `gs.getPropertySecured`; each declares read and write roles `admin`; the tracking webhook reads its token as guest, and *Ship* and *Create return label* read the ShipEngine key as asset managers or inventory techs | Not documented (only the signature in the typings). On an instance `getPropertySecured` checks the property's read roles against the session user and gives a non-admin the default; `getProperty` gives everyone the stored value | matches | N44, N45 |
 | A work note on a task-extended table | A note is added by assigning `work_notes` (`platform/records.ts` addWorkNote) and stored by the next insert or update, even one that changes nothing else | `setValue('work_notes', x)`, `setValue('comments', x)` and `getElement(f).setValue(x)` store nothing, in global and in `x_daas_ham`: the field reads back blank and a save with nothing else changed writes nothing yet returns the sys_id. Assignment stores one journal entry per assignment. `setJournalEntry` and `setDisplayValue` are refused in `x_daas_ham`. A journal field reads blank once read or saved | matches | N46 |
+| Deleting a record producer's own record | A record its post-insert script refuses is deleted read again by its sys_id (`platform/records.ts` removeStored), not through the script's `current` | `current.deleteRecord()` in the post-insert script returns false, as admin too, with *Error during delete of ...* and a NullPointerException in `com.glide.db.PrimaryKey.getValue`; the row stays. A GlideRecord read by the same sys_id deletes it | matches | N47 |
 
 Notes:
 
@@ -1105,6 +1106,16 @@ Sources:
   *NaaS - chase overdue returns* closed a Return with no line and stored no note. A fresh `get` read
   `work_notes` as `''`. The test records and the cross-scope privileges the runs granted were
   deleted afterwards.
+- N47: development instance, 2026-11-12. Through the deployed producers, as a service desk agent
+  (a Return for a Site of another Customer), as a user with no NaaS role (an Order) and as admin (a
+  Return), the app's `current.deleteRecord()` failed: the Return and Order orders stayed open with
+  their answers, the system log had *Error during delete of ...* with a NullPointerException in
+  `com.glide.db.PrimaryKey.getValue`, then the app's *not removed* warning. On a copy of a producer
+  writing `sys_user_preference`, `current.deleteRecord()` in the post-insert script returned false
+  and the row stayed; a `GlideRecord` read by `current`'s sys_id there returned true and the row was
+  gone. In `x_daas_ham`, admin deleted one of the kept Orders read the same way. Each answer of a
+  deleted record stays: `question_answer.table_sys_id` is a plain string and nothing removes them.
+  The test records were deleted afterwards.
 
 ## Changes needed in the app
 

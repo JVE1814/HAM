@@ -9,7 +9,7 @@ beforeEach(() => platform.reset())
 
 describe('afterReturnProduced', () => {
     it('does nothing for a Return order that is not stored: a rule refused its insert and said why', () => {
-        afterReturnProduced({ assets: 'a1' }, recordOf<GlideRecord>('x_daas_ham_return_order', { sys_id: 'ret9', customer: 'other', site: 'site9' }))
+        afterReturnProduced({ assets: 'a1' }, recordOf<GlideRecord>('x_daas_ham_return_order', { sys_id: 'ret9', customer: 'other', site: 'site9' }, { produced: true }))
         expect(platform.messages).toEqual([])
         expect(platform.logs).toEqual([])
     })

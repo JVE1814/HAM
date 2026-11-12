@@ -386,7 +386,9 @@ kept, so this does not show whether the create rule sees them); the
 customer page's *Return selected* and the two record producers still work. As a service desk
 agent (`sn_customerservice_agent` only), the order producer offers the Customer's Agreements and
 Site templates, the generated Order opens with its lines and *Submit* goes ahead, and the return
-producer opens the Return it raised.
+producer opens the Return it raised. A Return they request through the producer for a Site of
+another Customer is refused and removed: no Return order of it stays open, and the system log has
+no *not removed* warning.
 
 The before-insert rules (`returns/logic.now.ts`, `orders/logic.now.ts`). A customer admin is an
 external user (`snc_external`), and the platform's `*.*` create field ACL lets only internal users

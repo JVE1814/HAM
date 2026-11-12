@@ -50,7 +50,7 @@ import { clearRackPlacement } from './racks.ts'
 import { attemptLock, withLock } from './locks.ts'
 import { intProperty } from './properties.ts'
 import { PROPERTY } from '../domain/properties.ts'
-import { addWorkNote, bool, choice, exists, findById, num, refusal, str, warnRefused } from './records.ts'
+import { addWorkNote, bool, choice, exists, findById, num, refusal, removeStored, str, warnRefused } from './records.ts'
 import { creatorOf, currentSession } from './session.ts'
 import { moveAlongPath } from './stock.ts'
 import { endSitePackageIfEmpty } from './subscriptions.ts'
@@ -340,7 +340,9 @@ export function requestProducedReturn(order: GlideRecord, listedAssetIds: readon
         method: str(order, 'method') as ReturnMethod | '',
         describe: () => str(order, 'short_description') || `Return from ${order.getDisplayValue('site')}`,
     })
-    if (!outcome.raised && !order.deleteRecord()) warnRefused(order, `Refused return ${str(order, 'number')} not removed`)
+    if (outcome.raised) return outcome
+    const kept = removeStored(order)
+    if (kept) log.warn(`Refused return ${str(order, 'number')} not removed: ${kept}`)
     return outcome
 }
 

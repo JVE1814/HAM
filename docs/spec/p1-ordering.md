@@ -19,7 +19,8 @@
 - **Submit** on the Order form does nothing when the form's save is refused (the platform says why):
   it assesses nothing, asks no approvers and starts no sourcing from values the form did not save.
 - Through the record producer, an Order its requester may not raise is removed again (one the platform
-  keeps is logged, to cancel). One that names records not of its Customer stays a draft with its lines
+  keeps is logged, to cancel). Its answers to the producer's questions stay on the instance: the
+  platform's `question_answer` table lets no application delete from it. One that names records not of its Customer stays a draft with its lines
   (except those of a Site template not offered to the Customer), to correct and submit. So does one
   missing a line the platform refused: the user is told, and its work notes say, how many order lines
   were not saved, to add them and submit.

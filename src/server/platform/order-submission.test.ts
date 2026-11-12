@@ -224,3 +224,27 @@ describe('an Order saved in a Customer contact session', () => {
         expect(refusalOf({ customer: 'acme', site: 'site9', agreement: 'agr9' })).toBeNull()
     })
 })
+
+describe('an Order the record producer saved for a requester who may not raise it', () => {
+    const produced = () => recordOf<GlideRecord>(ORDERS, storedOrder(), { produced: true })
+
+    beforeEach(() => {
+        platform.creatable = () => false
+    })
+
+    it('is removed again, with no line', () => {
+        expect(submitProducedOrder(produced(), [{ modelId: 'model1', quantity: 1 }], '')).toEqual({ submitted: false, message: 'Order not raised. You may not raise orders.' })
+
+        expect(rows(ORDERS)).toEqual([])
+        expect(platform.warnings).toEqual([])
+    })
+
+    it('is logged, to cancel, when the platform keeps it', () => {
+        platform.refuses = (table, _row, operation) => (table === ORDERS && operation === 'delete' ? 'kept for this test' : '')
+
+        submitProducedOrder(produced(), [], '')
+
+        expect(storedOrder()).toMatchObject({ sys_id: 'order1', stage: 'draft' })
+        expect(platform.warnings).toEqual(['[x_daas_ham] ORD0001 not removed (You may not raise orders), cancel it: kept for this test'])
+    })
+})

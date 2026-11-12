@@ -32,7 +32,7 @@ import { readStage } from './assets.ts'
 import { orderShipment } from './fulfilment.ts'
 import { withLock, withLockTries } from './locks.ts'
 import { addOrderLines, saveLineStage, withOrderLineLocks, type NewLine, type RefusedLine } from './order-lines.ts'
-import { addWorkNote, bool, findById, num, refusal, str, warnRefused } from './records.ts'
+import { addWorkNote, bool, findById, num, refusal, removeStored, str, warnRefused } from './records.ts'
 import { creatorOf, currentSession } from './session.ts'
 import { queueSourcing, queueSubmissionAgain } from './sourcing-requests.ts'
 import { skipOpenStagingTasks } from './staging-tasks.ts'
@@ -44,14 +44,6 @@ import { log } from './log.ts'
  * None of it tells the user anything: each gives what came of it, for the trigger that asked (a form button, the
  * record producer, the refresh job) to report.
  */
-
-/**
- * Remove an Order raised in vain (one its raiser may not raise, or none of whose lines was saved): why the platform
- * kept it ('' once removed), for the caller to name it for cancelling.
- */
-function removeOrder(order: GlideRecord): string {
-    return order.deleteRecord() ? '' : refusal(order, 'the delete was refused')
-}
 
 export interface NewOrder {
     orderType: OrderType
@@ -96,7 +88,7 @@ export function createOrder(header: NewOrder, lines: readonly NewLine[]): OrderC
     if (!order.insert()) return { created: false, step: 'order', reason: refusal(order) }
     const refused = addOrderLines(order, lines)
     if (refused.length < lines.length) return { created: true, order, refused }
-    return { created: false, step: 'lines', number: str(order, 'number'), refused, kept: removeOrder(order) }
+    return { created: false, step: 'lines', number: str(order, 'number'), refused, kept: removeStored(order) }
 }
 
 /**
@@ -126,8 +118,8 @@ export function submitProducedOrder(order: GlideRecord, devices: readonly NewLin
     const number = str(order, 'number')
     const mayNot = raiserRefusal(parties.customerId, raiser)
     if (mayNot) {
-        const kept = removeOrder(order)
-        if (kept) warnRefused(order, `${number} not removed (${mayNot}), cancel it`)
+        const kept = removeStored(order)
+        if (kept) log.warn(`${number} not removed (${mayNot}), cancel it: ${kept}`)
         return { submitted: false, message: `Order not raised. ${mayNot}.` }
     }
     const fromTemplate = parties.siteTemplate && siteTemplateOffered(parties) ? siteTemplateLines(parties.siteTemplate.id) : []

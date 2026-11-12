@@ -90,8 +90,10 @@ is never replaced, returned, refreshed, declared missing, charged for or dispose
 - Through the record producer, a return is raised only when the Return create rule lets its requester
   in (asset managers, account managers, NOC, the service desk and Customer admins): a Customer admin
   requests only for their own Customer, the others for any Customer, and site contacts never. The Site
-  must be one of the Customer's Sites. Otherwise the request is removed again and the requester is
-  told why (`domain/returns.ts` `returnRequestFindings`). The Site choices follow the chosen Customer.
+  must be one of the Customer's Sites. Otherwise the request is removed again (one the platform keeps
+  is logged, to cancel) and the requester is told why (`domain/returns.ts` `returnRequestFindings`).
+  Its answers to the producer's questions stay on the instance: the platform's `question_answer`
+  table lets no application delete from it. The Site choices follow the chosen Customer.
 - A Return order saved in a Customer contact's session is checked before it is saved, whatever
   inserts it: it must name the contact's own Customer and one of that Customer's Sites, else it is
   refused with *Return not raised* and the reason (`platform/returns.ts`

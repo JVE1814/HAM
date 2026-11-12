@@ -4,7 +4,7 @@ import { fieldsOf, type Stage } from '../domain/lifecycle.ts'
 import { LOCK } from '../domain/lock-names.ts'
 import { FEE_STATUS, RETURN_LINE_STATUS } from '../domain/vocabulary.ts'
 import { withLock } from './locks.ts'
-import { chaseOverdue, contactReturnInsertRefusal, raiseReturn, requestReturn, returnSwappedAssets } from './returns.ts'
+import { chaseOverdue, contactReturnInsertRefusal, raiseReturn, requestProducedReturn, requestReturn, returnSwappedAssets } from './returns.ts'
 import { platform, recordOf, type Row } from '../test-support/fake-glide.ts'
 
 vi.mock('@servicenow/glide', async () => (await import('../test-support/fake-glide.ts')).glide)
@@ -306,5 +306,33 @@ describe('a Return order left open that no line keeps open', () => {
 
         expect(other.ran).toBe(true)
         expect(stateOf('retB')).toBe('1')
+    })
+})
+
+describe('a Return order the record producer saved for a requester who may not request it', () => {
+    const produced = () => recordOf<GlideRecord>(RETURNS, rows(RETURNS)[0] ?? {}, { produced: true })
+
+    beforeEach(() => {
+        platform.user = { id: 'produced-plain', name: 'Pat', company: 'provider', roles: [], interactive: true }
+        platform.creatable = () => false
+        platform.tables.cmn_location = [{ sys_id: 'site1', name: 'HQ', company: 'acme', x_daas_ham_is_site: 'true' }]
+        platform.tables[RETURNS] = [{ sys_id: 'ret1', number: 'RET0001', customer: 'acme', site: 'site1', trigger: 'device_removal', state: '1' }]
+    })
+
+    it('is removed again, with no line', () => {
+        expect(requestProducedReturn(produced(), ['a1'])).toEqual({ raised: false, reason: 'forbidden', why: 'You may not request returns' })
+
+        expect(rows(RETURNS)).toEqual([])
+        expect(rows(RETURN_LINES)).toEqual([])
+        expect(platform.warnings).toEqual([])
+    })
+
+    it('is logged, to cancel, when the platform keeps it', () => {
+        platform.refuses = (table, _row, operation) => (table === RETURNS && operation === 'delete' ? 'kept for this test' : '')
+
+        requestProducedReturn(produced(), ['a1'])
+
+        expect(rows(RETURNS)).toHaveLength(1)
+        expect(platform.warnings).toEqual(['[x_daas_ham] Refused return RET0001 not removed: kept for this test'])
     })
 })

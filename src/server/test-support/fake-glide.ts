@@ -20,6 +20,8 @@ import { compare, matchesQuery } from './encoded-query.ts'
  *     that is not stored: on the platform that inserts one, which no code here means to do;
  *   - a refused insert, update or delete returns what the platform returns (null, false) and leaves the reason in
  *     `getLastErrorMessage`;
+ *   - a record producer's `current` (`recordOf` with `produced`) refuses to delete itself, as on the platform; the same
+ *     row read afresh deletes;
  *   - `setValue` of a journal field (work_notes, comments) throws: the platform stores nothing for it. Assigning one
  *     queues an entry that the next insert or update stores in `platform.journal`, even with no other field changed.
  * A Glide method the fake does not have fails the test with a TypeError: add it here, once, with the platform's
@@ -239,6 +241,7 @@ class GlideRecord extends Conditions {
     private fresh = false
     private error = ''
     private notes: Array<{ field: string; value: string }> = []
+    produced = false
 
     hold(row: Row, fresh: boolean): this {
         this.row = { ...row }
@@ -396,7 +399,7 @@ class GlideRecord extends Conditions {
         const rows = store(this.table)
         const at = rows.findIndex((row) => row.sys_id === this.row.sys_id)
         if (at < 0) return false
-        this.error = this.refusal('delete', rows[at])
+        this.error = this.produced ? `Error during delete of ${this.table} (${displayOf(this.row)})` : this.refusal('delete', rows[at])
         if (this.error) return false
         rows.splice(at, 1)
         return true
@@ -524,8 +527,11 @@ export const glide = { GlideRecord, GlideAggregate, GlideDateTime, GlideSysAttac
 
 /**
  * A record of `table` holding `row`, as a rule, an ACL or a script action is handed one: read from the table, or with
- * `fresh` a record not saved yet. The row need not be stored.
+ * `fresh` a record not saved yet, or with `produced` the `current` a record producer's scripts are handed. The row need
+ * not be stored.
  */
-export function recordOf<Record = unknown>(table: string, row: Row, options: { fresh?: boolean } = {}): Record {
-    return new GlideRecord(table).hold(row, options.fresh === true) as Record
+export function recordOf<Record = unknown>(table: string, row: Row, options: { fresh?: boolean; produced?: boolean } = {}): Record {
+    const record = new GlideRecord(table).hold(row, options.fresh === true)
+    record.produced = options.produced === true
+    return record as Record
 }

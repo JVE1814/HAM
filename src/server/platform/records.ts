@@ -20,6 +20,17 @@ export function findById(table: string, sysId: string, options: ReadOptions = {}
     return found ? gr : null
 }
 
+/**
+ * Delete the stored row `record` holds, read again by its sys_id past the app's visibility rules: why the platform kept
+ * it, or '' once it is gone. A record producer's `current` cannot delete itself; the row read again can
+ * (docs/research/external-contracts.md N47).
+ */
+export function removeStored(record: GlideRecord): string {
+    const stored = findById(record.getTableName(), record.getUniqueValue(), { beyondVisibility: true })
+    if (!stored || stored.deleteRecord()) return ''
+    return refusal(stored, 'the delete was refused')
+}
+
 /** Whether `record` is a stored row, read past the app's visibility rules: false for one a rule refused to insert. */
 export function isStored(record: GlideRecord): boolean {
     return findById(record.getTableName(), record.getUniqueValue(), { beyondVisibility: true }) !== null

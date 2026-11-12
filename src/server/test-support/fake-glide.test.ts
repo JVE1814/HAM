@@ -277,6 +277,14 @@ describe('the rest of the instance', () => {
         expect(platform.tables[LINES]).toHaveLength(4)
     })
 
+    it("refuses a record producer's current its own delete, which the row read afresh is allowed", () => {
+        const current = recordOf<InstanceType<typeof GlideRecord>>(ORDERS, { sys_id: 'o1', number: 'ORD1' }, { produced: true })
+        expect(current.deleteRecord()).toBe(false)
+        expect(current.getLastErrorMessage()).toBe(`Error during delete of ${ORDERS} (ORD1)`)
+        expect(find(ORDERS, 'o1').deleteRecord()).toBe(true)
+        expect(platform.tables[ORDERS].map((row) => row.sys_id)).toEqual(['o2'])
+    })
+
     it('attaches a file to a record as a sys_attachment row, keeps its content and deletes it by sys_id', () => {
         const attachments = new GlideSysAttachment()
         const id = attachments.write(find(ORDERS, 'o1'), 'order.csv', 'text/csv', 'a,b\r\n') ?? ''
