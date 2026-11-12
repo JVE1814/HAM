@@ -1,0 +1,12 @@
+import type { CustomerAsset } from '../../server/domain/rest-contracts'
+
+/** The equipment per Site, Sites and devices in the order the server sent them. '' is the devices with no Site. */
+export function bySite(assets: readonly CustomerAsset[]): Map<string, CustomerAsset[]> {
+    const sites = new Map<string, CustomerAsset[]>()
+    for (const asset of assets) {
+        const at = sites.get(asset.siteId)
+        if (at) at.push(asset)
+        else sites.set(asset.siteId, [asset])
+    }
+    return sites
+}
