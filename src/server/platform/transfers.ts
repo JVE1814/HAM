@@ -108,8 +108,7 @@ export function onTransferOrderLine(asset: ForeignRecord): boolean {
  */
 export function takeBackStageAfterTransfer(current: ForeignRecord, previous: ForeignRecord): void {
     const now = readStage(current)
-    const released = readStage(previous) === 'in_transfer' && now !== 'in_transfer' && !onTransferOrderLine(current)
-    if (!released) return
+    if (!releasedFromTransfer(current, previous) || now === 'in_transfer') return
     const stage = stageAfterTransfer(transferContext(current))
     // From the stock Inventory made it: each stage it can take back is a move the matrix allows from there.
     const verdict = moveAsset(current, stage)
@@ -134,10 +133,19 @@ function transferContext(asset: ForeignRecord): TransferContext {
 }
 
 /**
- * Whether Inventory let the Asset go from the transfer sourcing raised for it short of the staging centre, its line
- * cancelled or deleted (domain/lifecycle `transferFellThrough`): read once the save that let it go is made, from the
- * Asset as saved.
+ * Whether the save (`current`, `previous` as stored) let the Asset go from the transfer sourcing raised for it short
+ * of the staging centre, its line cancelled or deleted (domain/lifecycle `transferFellThrough`): read once the save is
+ * made, from the Asset as saved.
  */
-export function fellShortOfStagingCentre(asset: ForeignRecord): boolean {
-    return !onTransferOrderLine(asset) && transferFellThrough(transferContext(asset))
+export function fellShortOfStagingCentre(current: ForeignRecord, previous: ForeignRecord): boolean {
+    return releasedFromTransfer(current, previous) && transferFellThrough(transferContext(current))
+}
+
+/**
+ * Whether the save took the Asset off its transfer order line. Its stage can stay In transfer: a line received after
+ * its last task was closed skipped only clears the flag, and a form save may then switch between the two ways In
+ * transfer is stored.
+ */
+function releasedFromTransfer(current: ForeignRecord, previous: ForeignRecord): boolean {
+    return readStage(previous) === 'in_transfer' && !onTransferOrderLine(current)
 }

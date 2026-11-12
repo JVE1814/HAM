@@ -116,7 +116,6 @@ export function uiCancelOrder(current: GlideRecord): void {
 export function onAllocatedAssetStageChange(current: ForeignRecord, previous: ForeignRecord): void {
     const lineId = str(current, 'x_daas_ham_order_line')
     if (!lineId) return
-    const from = readStage(previous)
-    if (from === 'in_transfer' && fellShortOfStagingCentre(current)) return void putBackUntransferred(current, lineId)
-    onLineAssetMoved(current, lineId, from, readStage(current))
+    if (fellShortOfStagingCentre(current, previous)) return void putBackUntransferred(current, lineId)
+    onLineAssetMoved(current, lineId, readStage(previous), readStage(current))
 }
