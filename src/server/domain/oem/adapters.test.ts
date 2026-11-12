@@ -345,6 +345,12 @@ describe('claimRouted', () => {
         expect(claimRouted('', 'oem_claim')).toBe(false)
         expect(claimRouted('acme', 'oem_claim')).toBe(false)
     })
+
+    it('reads no name an object inherits as a vendor or an action', () => {
+        expect(claimRouted('cisco', 'constructor')).toBe(false)
+        expect(claimRouted('constructor', 'name')).toBe(false)
+        expect(claimRouted('meraki', 'toString')).toBe(false)
+    })
 })
 
 describe('enabledClaims', () => {
