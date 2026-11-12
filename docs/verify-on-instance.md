@@ -701,6 +701,14 @@ lock*, *Execute now* on its job does nothing. It logs two *Unique Key violation*
 returns not chased: another run holds the overdue_returns_run lock and chases them* (info). Delete
 the row and the next run does the work.
 
+### Replacement lock
+
+*Raise replacement* on a case ([how a job lock behaves](#how-a-job-lock-behaves)). The press raises,
+links and submits the replacement Order under the job lock `replacement_case_<case sys_id>`. With
+a row of that name in *Job lock*, *Raise replacement* on that case raises no Order. It logs two
+*Unique Key violation* errors and shows *A replacement is being raised for this case. Reload the
+case to see its Order*. Delete the row and the next press raises the Order.
+
 ### Spare-pool lock
 
 Daily spare-pool top-up ([how a job lock behaves](#how-a-job-lock-behaves)). The *NaaS - spare pool

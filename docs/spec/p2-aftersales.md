@@ -23,6 +23,10 @@ is never replaced, returned, refreshed, declared missing, charged for or dispose
   cancelled: a new Order then takes its place on the case. A form opened before the link can still send
   it: a linked draft is then submitted again, and a linked Order awaiting approval, going ahead or
   complete is kept (`domain/breakfix.ts`).
+  Two presses at once take turns under a job lock on the case (`LOCK.replacementCase` in
+  `domain/lock-names.ts`, ADR 0013): one that finds it held raises nothing and says *A replacement
+  is being raised for this case*, and each press reads the Order the case links afresh under the
+  lock, so a press that follows another keeps the Order that one linked.
 - Replacement lines skip the entitlement checks: a like-for-like swap is not a new catalog choice and
   adds no usage.
 - Sourcing follows the replacement priority: hot spare at the Site (in a customer-site stockroom

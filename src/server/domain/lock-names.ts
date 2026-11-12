@@ -18,6 +18,11 @@ export const LOCK = {
     /** Held by the daily refresh run from its read of the Assets due to its last Order. */
     refreshOrders: () => named('refresh_orders'),
     /**
+     * Raise replacement on a case reads the Order the case links, raises one, links it and submits it under it, so two
+     * presses at once never raise an Order each.
+     */
+    replacementCase: (caseId: string) => named(`replacement_case_${caseId}`),
+    /**
      * An Agreement's submissions take turns under it: each reads the Agreement's usage, assesses its Order and saves it
      * out of draft, which makes it count in flight, before the next reads. Two read at once would each miss the other
      * and could both go ahead within a Contracted quantity only one fits.
