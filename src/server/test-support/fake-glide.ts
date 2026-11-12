@@ -202,9 +202,6 @@ class Conditions {
     addActiveQuery(): void {
         this.conditions.push('active=true')
     }
-    getEncodedQuery(): string {
-        return this.conditions.join('^')
-    }
 
     protected matching(): Row[] {
         // How the platform joins a ^NQ query with further conditions is not something a test should lean on.
@@ -263,9 +260,6 @@ class GlideRecord extends Conditions {
         if (row) this.hold(row, false)
         return row !== undefined
     }
-    getRowCount(): number {
-        return this.found.length
-    }
     get(fieldOrId: string, value?: string): boolean {
         const [field, wanted] = value === undefined ? ['sys_id', fieldOrId] : [fieldOrId, value]
         const row = wanted ? rowsOf(this.table).find((candidate) => walk(this.table, candidate, field) === String(wanted)) : undefined
@@ -276,14 +270,8 @@ class GlideRecord extends Conditions {
     initialize(): void {
         this.hold(inHierarchy(this.table) ? { sys_class_name: this.table } : {}, true)
     }
-    newRecord(): void {
-        this.initialize()
-    }
     isNewRecord(): boolean {
         return this.fresh
-    }
-    isValidRecord(): boolean {
-        return this.read !== null
     }
     getTableName(): string {
         return this.table
@@ -378,8 +366,6 @@ class GlideRecord extends Conditions {
 const AGGREGATES: Record<string, (values: string[]) => string> = {
     COUNT: (values) => String(values.length),
     SUM: (values) => String(values.reduce((sum, value) => sum + (Number(value) || 0), 0)),
-    MIN: (values) => [...values].sort(inOrder)[0] ?? '',
-    MAX: (values) => [...values].sort(inOrder).at(-1) ?? '',
 }
 
 class GlideAggregate extends Conditions {
@@ -458,17 +444,12 @@ const log = (level: string) => (message: string) => void platform.logs.push(`${l
 const gs = {
     eventQueue: queue(false),
     eventQueueScheduled: queue(true),
-    debug: log('debug'),
     info: log('info'),
     warn: log('warn'),
     error: log('error'),
     addErrorMessage: (message: string) => void platform.messages.push(`error ${message}`),
     addInfoMessage: (message: string) => void platform.messages.push(`info ${message}`),
     getProperty: (name: string, fallback?: string) => platform.properties[name] ?? fallback ?? null,
-    // As the platform answers for a property only admin may read, as every password2 property of the app is: the
-    // default to anyone else (docs/research/external-contracts.md N45).
-    getPropertySecured: (name: string, fallback?: string) =>
-        platform.user.roles.includes('admin') ? (platform.properties[name] ?? fallback ?? null) : (fallback ?? null),
     setProperty: (name: string, value: string) => void (platform.properties[name] = String(value)),
     getUserID: () => platform.user.id,
     getUserDisplayName: () => platform.user.name,
