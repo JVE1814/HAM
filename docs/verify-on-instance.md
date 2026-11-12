@@ -90,8 +90,9 @@ endsON2028-01-31@javascript:gs.dateGenerate('2028-01-31','start')@javascript:gs.
 
 ### ATF route tests
 
-Suites *NaaS - P1*, *P2* and *P3*. The tests of the customer returns, warehouse and audit scan
-routes call each route's handler from a *Run Server Side Script* step, as the
+Suites *NaaS - P1*, *P2* and *P3*. The tests of the customer returns, fault, install confirmation
+and attestation routes, and of the warehouse and audit scan routes, call each route's handler from
+a *Run Server Side Script* step, as the
 impersonated user, with `require('x_daas_ham/naas-ham/<version>/src/server/entry/<file>.ts')`.
 ATF's inbound REST step signs in through a basic auth profile, which the app's scope may not
 create. Confirm that these steps run (no *require is not defined* or *No module with path*).

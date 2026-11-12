@@ -1,7 +1,8 @@
 import '@servicenow/sdk/global'
 import { Test } from '@servicenow/sdk/core'
-import { INSTALL_STATUS, STOCKROOM_TYPE } from '../../server/domain/vocabulary'
-import { customerAdmin, inventoryTech, noc } from './roles.now'
+import { ATTESTATION_STATE } from '../../server/domain/audit'
+import { DEVICE_CLASS, INSTALL_MODE, INSTALL_STATUS, LEGAL_OWNER, LINE_STAGE, ORDER_STAGE, ORDER_TYPE, STAGE_FIELDS, STOCKROOM_TYPE } from '../../server/domain/vocabulary'
+import { assetManager, customerAdmin, inventoryTech, noc } from './roles.now'
 
 /*
  * ATF: before-query visibility rules (ADR 0005) on the hardware the app shares with the Provider's IT (ADR 0016), and
@@ -18,6 +19,17 @@ import { customerAdmin, inventoryTech, noc } from './roles.now'
 const IN_STOCK = INSTALL_STATUS.inStock
 const IN_USE = INSTALL_STATUS.inUse
 const CENTRAL_DEPOT = STOCKROOM_TYPE.central_depot
+const IN_TRANSIT = INSTALL_STATUS.inTransit
+const SHIPPED_TO_SITE = STAGE_FIELDS.shipped.substatus
+const PROVIDER_OWNED = LEGAL_OWNER.provider
+const SWITCH = DEVICE_CLASS.switch
+const DEVICE_ADD = ORDER_TYPE.device_add
+const SELF_INSTALL = INSTALL_MODE.self_install
+const ORDER_INSTALLING = ORDER_STAGE.installing
+const LINE_SHIPPED = LINE_STAGE.shipped
+const STILL_SHIPPED_FIELDS = `install_status=${STAGE_FIELDS.shipped.installStatus}^substatus=${STAGE_FIELDS.shipped.substatus}`
+const STILL_INSTALLING_FIELDS = `stage=${ORDER_STAGE.installing}`
+const NOT_CLOSED_FIELDS = `state!=${ATTESTATION_STATE.closed}`
 
 export const customerAdminVisibilityTest = Test(
     {
@@ -419,6 +431,319 @@ export const inventoryTechAuditScanTest = Test(
         return false;
     }
 })(outputs, steps, params, stepResult, assertEqual);`,
+        })
+    },
+)
+
+/*
+ * Suite "NaaS - P2". The customer page's routes that take a record's sys_id (report a fault, confirm a self-install,
+ * answer an attestation) have no tenant check of their own: each reads the record as the caller, so the before-query
+ * rules (ADR 0005) are what keep a Customer admin to their own Customer. The first script calls each handler as
+ * Customer B's admin with Customer A's sys_ids, found past the rules as the app's own server logic finds them. An
+ * attestation item has no before-query rule, so the last call names Customer A's item on Customer B's own
+ * attestation: there the handler's check that an item belongs to the attestation is what skips the answer. The
+ * second script calls the same handlers as Customer A's admin, which shows that the fixtures were live and that only
+ * the caller's Customer made the difference.
+ */
+export const customerRoutesOtherCustomerTest = Test(
+    {
+        $id: Now.ID['atf_customer_routes_other_customer'],
+        name: 'NaaS - customer routes refuse the device, order and attestation of another customer',
+        description:
+            "Calls the customer fault, install confirmation and attestation handlers as Customer B's admin with Customer A's device, self-install Order and attestation (HTTP 404, 409 and 404), and with A's attestation item on B's own attestation (HTTP 200, the answer skipped); no case is opened, the unit stays shipped and the item unanswered. The same calls as Customer A's admin then find each record.",
+        active: true,
+        // The handlers log what the platform refuses them; the scripts and validations below check the outcome.
+        failOnServerError: false,
+    },
+    (atf) => {
+        const customerA = atf.server.recordInsert({
+            $id: Now.ID['atf_cxt_customer_a'],
+            table: 'customer_account',
+            fieldValues: { name: 'ATF Routes Customer A', customer: true },
+        })
+        const customerB = atf.server.recordInsert({
+            $id: Now.ID['atf_cxt_customer_b'],
+            table: 'customer_account',
+            fieldValues: { name: 'ATF Routes Customer B', customer: true },
+        })
+        const siteA = atf.server.recordInsert({
+            $id: Now.ID['atf_cxt_site_a'],
+            table: 'cmn_location',
+            fieldValues: { name: 'ATF Routes Site A', x_daas_ham_is_site: true, company: customerA.record_id },
+        })
+        const siteB = atf.server.recordInsert({
+            $id: Now.ID['atf_cxt_site_b'],
+            table: 'cmn_location',
+            fieldValues: { name: 'ATF Routes Site B', x_daas_ham_is_site: true, company: customerB.record_id },
+        })
+        const model = atf.server.recordInsert({
+            $id: Now.ID['atf_cxt_model'],
+            table: 'cmdb_model',
+            fieldValues: { name: 'ATF Routes Switch', x_daas_ham_oem_pid: 'ATF-RTE-24', x_daas_ham_device_class: SWITCH },
+        })
+        const agreement = atf.server.recordInsert({
+            $id: Now.ID['atf_cxt_agreement'],
+            table: 'x_daas_ham_agreement',
+            fieldValues: { customer: customerA.record_id, short_description: 'ATF routes agreement', state: 'active', currency: 'EUR' },
+        })
+        // Customer A's device in service: what a fault is reported on, and what its attestation lists.
+        const installed = atf.server.recordInsert({
+            $id: Now.ID['atf_cxt_asset_installed'],
+            table: 'alm_hardware',
+            fieldValues: {
+                serial_number: 'ATF-RTE-0001',
+                model: model.record_id,
+                company: customerA.record_id,
+                install_status: IN_USE,
+                quantity: 1,
+                x_daas_ham_fleet: true,
+                x_daas_ham_agreement: agreement.record_id,
+                x_daas_ham_site: siteA.record_id,
+            },
+            enforceSecurity: false,
+        })
+        // Customer A's self-install Order with its one unit shipped: installing, so it waits for the confirmation
+        // whoever counts its shipped units.
+        const order = atf.server.recordInsert({
+            $id: Now.ID['atf_cxt_order'],
+            table: 'x_daas_ham_order',
+            fieldValues: {
+                customer: customerA.record_id,
+                site: siteA.record_id,
+                agreement: agreement.record_id,
+                order_type: DEVICE_ADD,
+                install_mode: SELF_INSTALL,
+                short_description: 'ATF routes self-install order',
+                stage: ORDER_INSTALLING,
+                approval: 'approved',
+                entitlement_verdict: 'within_agreement',
+            },
+            enforceSecurity: false,
+        })
+        const line = atf.server.recordInsert({
+            $id: Now.ID['atf_cxt_order_line'],
+            table: 'x_daas_ham_order_line',
+            fieldValues: { order: order.record_id, model: model.record_id, quantity: 1, line_stage: LINE_SHIPPED },
+            enforceSecurity: false,
+        })
+        const shipped = atf.server.recordInsert({
+            $id: Now.ID['atf_cxt_asset_shipped'],
+            table: 'alm_hardware',
+            fieldValues: {
+                serial_number: 'ATF-RTE-0002',
+                model: model.record_id,
+                company: customerA.record_id,
+                install_status: IN_TRANSIT,
+                substatus: SHIPPED_TO_SITE,
+                quantity: 1,
+                x_daas_ham_fleet: true,
+                x_daas_ham_legal_owner: PROVIDER_OWNED,
+                x_daas_ham_order_line: line.record_id,
+                x_daas_ham_agreement: agreement.record_id,
+                x_daas_ham_site: siteA.record_id,
+            },
+            enforceSecurity: false,
+        })
+        const attestationA = atf.server.recordInsert({
+            $id: Now.ID['atf_cxt_attestation_a'],
+            table: 'x_daas_ham_attestation',
+            fieldValues: { customer: customerA.record_id, site: siteA.record_id, short_description: 'ATF routes attestation A' },
+            enforceSecurity: false,
+        })
+        const item = atf.server.recordInsert({
+            $id: Now.ID['atf_cxt_attestation_item'],
+            table: 'x_daas_ham_attestation_item',
+            fieldValues: { attestation: attestationA.record_id, asset: installed.record_id },
+            enforceSecurity: false,
+        })
+        // Customer B's own open attestation, with no item: the one its admin may answer.
+        atf.server.recordInsert({
+            $id: Now.ID['atf_cxt_attestation_b'],
+            table: 'x_daas_ham_attestation',
+            fieldValues: { customer: customerB.record_id, site: siteB.record_id, short_description: 'ATF routes attestation B' },
+            enforceSecurity: false,
+        })
+        const adminB = atf.server.createUser({
+            $id: Now.ID['atf_cxt_admin_b'],
+            firstName: 'ATF',
+            lastName: 'Routes Admin B',
+            table: 'customer_contact',
+            fieldValues: { company: customerB.record_id },
+            roles: [customerAdmin],
+            impersonate: false,
+        })
+        const adminA = atf.server.createUser({
+            $id: Now.ID['atf_cxt_admin_a'],
+            firstName: 'ATF',
+            lastName: 'Routes Admin A',
+            table: 'customer_contact',
+            fieldValues: { company: customerA.record_id },
+            roles: [customerAdmin],
+            impersonate: false,
+        })
+        const manager = atf.server.createUser({
+            $id: Now.ID['atf_cxt_asset_manager'],
+            firstName: 'ATF',
+            lastName: 'Routes Asset Manager',
+            roles: [assetManager],
+            impersonate: false,
+        })
+        atf.server.impersonate({ $id: Now.ID['atf_cxt_impersonate_admin_b'], user: adminB.user })
+        atf.server.runServerSideScript({
+            $id: Now.ID['atf_cxt_other_customer_refused'],
+            script: `(function (outputs, steps, params, stepResult, assertEqual) {
+    var customer = require('x_daas_ham/naas-ham/0.1.0/src/server/entry/customer.ts');
+    var visibility = require('x_daas_ham/naas-ham/0.1.0/src/server/platform/beyond-visibility.ts');
+    function call(handler, data, pathParams) {
+        var reply = { status: 0, body: null };
+        var request = { body: { data: data }, pathParams: pathParams || {}, queryParams: {}, getHeader: function () { return undefined; } };
+        var response = {
+            setStatus: function (status) { reply.status = Number(status); },
+            setBody: function (body) { reply.body = body; },
+            setHeader: function () {},
+            setContentType: function () {}
+        };
+        handler(request, response);
+        return reply;
+    }
+    function find(table, query, pastRules) {
+        var record = new GlideRecord(table);
+        record.addEncodedQuery(query);
+        record.setLimit(1);
+        if (pastRules) visibility.beyondVisibility(record, function () { record.query(); });
+        else record.query();
+        if (!record.next()) throw new Error('no ' + table + ' matches ' + query + (pastRules ? '' : ' for this user'));
+        return record.getUniqueValue();
+    }
+    function expectReply(what, reply, status, error) {
+        var got = 'HTTP ' + reply.status + ' ' + JSON.stringify(reply.body);
+        var message = reply.body && reply.body.error ? String(reply.body.error) : '';
+        if (reply.status !== status || (error && message.indexOf(error) < 0)) {
+            throw new Error(what + ': expected HTTP ' + status + (error ? ' saying "' + error + '"' : '') + ', got ' + got);
+        }
+        return what + ': ' + got;
+    }
+    try {
+        var device = find('alm_hardware', 'serial_number=ATF-RTE-0001^x_daas_ham_fleet=true', true);
+        var order = find('x_daas_ham_order', 'short_description=ATF routes self-install order', true);
+        var theirs = find('x_daas_ham_attestation', 'short_description=ATF routes attestation A', true);
+        var item = find('x_daas_ham_attestation_item', 'attestation=' + theirs, true);
+        var own = find('x_daas_ham_attestation', 'short_description=ATF routes attestation B', false);
+        var answer = [{ id: item, response: 'missing' }];
+        var seen = [];
+        seen.push(expectReply('A fault on another Customer device', call(customer.reportFault, { asset: device, description: 'ATF routes fault' }), 404, 'Unknown device'));
+        seen.push(expectReply('Another Customer self-install', call(customer.confirmInstalled, {}, { id: order }), 409, 'not waiting for a self-install confirmation'));
+        seen.push(expectReply('Another Customer attestation', call(customer.answerAttestation, { items: answer, submit: true }, { id: theirs }), 404, 'No open attestation'));
+        seen.push(expectReply('Another Customer item on their own attestation', call(customer.answerAttestation, { items: answer }, { id: own }), 200));
+        stepResult.setOutputMessage(seen.join('; '));
+        return true;
+    } catch (e) {
+        stepResult.setOutputMessage(String(e && e.message ? e.message : e));
+        return false;
+    }
+})(outputs, steps, params, stepResult, assertEqual);`,
+        })
+        // A customer reads no Asset's stage (fleet/access.now.ts), so the provider checks that nothing changed.
+        atf.server.impersonate({ $id: Now.ID['atf_cxt_impersonate_manager'], user: manager.user })
+        atf.server.recordQuery({
+            $id: Now.ID['atf_cxt_no_case'],
+            table: 'sn_customerservice_case',
+            fieldValues: `x_daas_ham_failed_asset=${installed.record_id}`,
+            assert: 'no_records_match_query',
+        })
+        atf.server.recordValidation({
+            $id: Now.ID['atf_cxt_validate_shipped'],
+            table: 'alm_hardware',
+            recordId: shipped.record_id,
+            fieldValues: STILL_SHIPPED_FIELDS,
+            assert: 'record_validated',
+        })
+        atf.server.recordValidation({
+            $id: Now.ID['atf_cxt_validate_order'],
+            table: 'x_daas_ham_order',
+            recordId: order.record_id,
+            fieldValues: STILL_INSTALLING_FIELDS,
+            assert: 'record_validated',
+        })
+        atf.server.recordValidation({
+            $id: Now.ID['atf_cxt_validate_attestation'],
+            table: 'x_daas_ham_attestation',
+            recordId: attestationA.record_id,
+            fieldValues: NOT_CLOSED_FIELDS,
+            assert: 'record_validated',
+        })
+        atf.server.recordValidation({
+            $id: Now.ID['atf_cxt_validate_item_unanswered'],
+            table: 'x_daas_ham_attestation_item',
+            recordId: item.record_id,
+            fieldValues: 'responseISEMPTY',
+            assert: 'record_validated',
+        })
+        // The control: the same calls as Customer A's admin find each record, so only the Customer told them apart.
+        atf.server.impersonate({ $id: Now.ID['atf_cxt_impersonate_admin_a'], user: adminA.user })
+        atf.server.runServerSideScript({
+            $id: Now.ID['atf_cxt_own_customer_found'],
+            script: `(function (outputs, steps, params, stepResult, assertEqual) {
+    var customer = require('x_daas_ham/naas-ham/0.1.0/src/server/entry/customer.ts');
+    var visibility = require('x_daas_ham/naas-ham/0.1.0/src/server/platform/beyond-visibility.ts');
+    function call(handler, data, pathParams) {
+        var reply = { status: 0, body: null };
+        var request = { body: { data: data }, pathParams: pathParams || {}, queryParams: {}, getHeader: function () { return undefined; } };
+        var response = {
+            setStatus: function (status) { reply.status = Number(status); },
+            setBody: function (body) { reply.body = body; },
+            setHeader: function () {},
+            setContentType: function () {}
+        };
+        handler(request, response);
+        return reply;
+    }
+    function find(table, query, pastRules) {
+        var record = new GlideRecord(table);
+        record.addEncodedQuery(query);
+        record.setLimit(1);
+        if (pastRules) visibility.beyondVisibility(record, function () { record.query(); });
+        else record.query();
+        if (!record.next()) throw new Error('no ' + table + ' matches ' + query + (pastRules ? '' : ' for this user'));
+        return record.getUniqueValue();
+    }
+    function expectReply(what, reply, status, error) {
+        var got = 'HTTP ' + reply.status + ' ' + JSON.stringify(reply.body);
+        var message = reply.body && reply.body.error ? String(reply.body.error) : '';
+        if (reply.status !== status || (error && message.indexOf(error) < 0)) {
+            throw new Error(what + ': expected HTTP ' + status + (error ? ' saying "' + error + '"' : '') + ', got ' + got);
+        }
+        return what + ': ' + got;
+    }
+    function expectFound(what, reply, notFound) {
+        var got = 'HTTP ' + reply.status + ' ' + JSON.stringify(reply.body);
+        if (reply.status === notFound) throw new Error(what + ': expected HTTP other than ' + notFound + ', got ' + got);
+        return what + ': ' + got;
+    }
+    try {
+        var device = find('alm_hardware', 'serial_number=ATF-RTE-0001^x_daas_ham_fleet=true', false);
+        var order = find('x_daas_ham_order', 'short_description=ATF routes self-install order', false);
+        var own = find('x_daas_ham_attestation', 'short_description=ATF routes attestation A', false);
+        var item = find('x_daas_ham_attestation_item', 'attestation=' + own, false);
+        var seen = [];
+        seen.push(expectFound('A fault on their own device', call(customer.reportFault, { asset: device, description: 'ATF routes fault' }), 404));
+        seen.push(expectFound('Their own self-install', call(customer.confirmInstalled, {}, { id: order }), 409));
+        seen.push(expectReply('Their own attestation', call(customer.answerAttestation, { items: [{ id: item, response: 'confirmed' }] }, { id: own }), 200));
+        stepResult.setOutputMessage(seen.join('; '));
+        return true;
+    } catch (e) {
+        stepResult.setOutputMessage(String(e && e.message ? e.message : e));
+        return false;
+    }
+})(outputs, steps, params, stepResult, assertEqual);`,
+        })
+        atf.server.impersonate({ $id: Now.ID['atf_cxt_impersonate_manager_again'], user: manager.user })
+        atf.server.recordValidation({
+            $id: Now.ID['atf_cxt_validate_item_answered'],
+            table: 'x_daas_ham_attestation_item',
+            recordId: item.record_id,
+            fieldValues: 'response=confirmed',
+            assert: 'record_validated',
         })
     },
 )
