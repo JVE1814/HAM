@@ -33620,6 +33620,13 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_ux_lib_asset'
+                        id: '7ad66f0bc87f4e5893ad802b59f8296a'
+                        key: {
+                            name: 'x_daas_ham/workspace/main-BKhfTmXr.js.map'
+                        }
+                    },
+                    {
                         table: 'sys_documentation'
                         id: '7ae05a432cac4cc09269cb41d8c6de52'
                         key: {
@@ -34914,6 +34921,7 @@ declare global {
                     {
                         table: 'sys_ux_lib_asset'
                         id: '81609157c51a48a2b6d4f37e6c2825e9'
+                        deleted: true
                         key: {
                             name: 'x_daas_ham/workspace/main-WHZR8dm5'
                         }
@@ -48975,6 +48983,7 @@ declare global {
                     {
                         table: 'sys_ux_lib_asset'
                         id: 'bf9e479c73cb4ba787495adc1557d461'
+                        deleted: true
                         key: {
                             name: 'x_daas_ham/workspace/main-WHZR8dm5.js.map'
                         }
@@ -60254,6 +60263,13 @@ declare global {
                             }
                             element: 'evaluation'
                             position: '7'
+                        }
+                    },
+                    {
+                        table: 'sys_ux_lib_asset'
+                        id: 'f5406c991b3c48349d36c6a41814a52d'
+                        key: {
+                            name: 'x_daas_ham/workspace/main-BKhfTmXr'
                         }
                     },
                     {

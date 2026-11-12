@@ -62,7 +62,9 @@
   `docs/verify-on-instance.md`).
 - The asset tiles of the *Billing integrity* tab count fleet assets only (ADR 0016): the Provider
   IT's equipment in use shares `alm_hardware` and is never billed. Its tile *In service without a
-  subscription line* counts fleet assets in service with no Subscription line, which bill nothing.
+  subscription line* counts fleet assets in service or on a temporary deployment with no
+  Subscription line, which bill nothing. Go-live leaves a unit there when no open Subscription
+  line of its Agreement matches it.
   *In service on a line not yet started* counts fleet assets in service or on a temporary
   deployment whose Subscription line is still *Pending*. Generation bills no pending line, so they
   bill nothing either. Go-live starts a pending line as it attaches a unit, so only a line set on

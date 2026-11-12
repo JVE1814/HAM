@@ -157,7 +157,7 @@ checked by reading only. Each executor still runs its own gate.
 | [043](043-billing-integrity-line-tiles.md) | Count on the Billing integrity tab the units on a pending line and the ended lines still billed | P2 | S | 025; after 024 | DONE (instance check pending) |
 | [044](044-ship-tracking-saved-message.md) | Link Ship's on-site work on the Order read again, so a refused tracking number stays unsaved | P3 | S | 031; after 030 | DONE (instance check pending) |
 | [045](045-close-empty-return-orders.md) | Close the open Return orders that no line keeps open, in the daily overdue-returns job | P3 | S | after 032 and 038 (landing order) | DONE (instance check pending) |
-| [046](046-unbilled-temporary-deployment.md) | Count on the Billing integrity tab a unit on a temporary deployment with no Subscription line | P2 | S | after 043 (landing order) | TODO |
+| [046](046-unbilled-temporary-deployment.md) | Count on the Billing integrity tab a unit on a temporary deployment with no Subscription line | P2 | S | after 043 (landing order) | DONE (instance check pending) |
 
 ### Dependency notes
 

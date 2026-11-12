@@ -119,10 +119,12 @@ export function endedLineProblem(line: { status: string; endDate: string }): str
 const NO_LINE = 'x_daas_ham_subscription_lineISEMPTY'
 
 /**
- * Encoded query on alm_hardware for the Billing integrity dashboard: fleet assets in service on no Subscription line,
- * which nothing bills. `fleetStagesQuery(['in_service'], NO_LINE)` written out for the tile to import.
+ * Encoded query on alm_hardware for the Billing integrity dashboard: fleet assets (ADR 0016) in a billed stage on no
+ * Subscription line, which nothing bills. Go-live attaches a unit to none when no open line of its Agreement matches
+ * it (platform/subscriptions), on a temporary deployment as in service. It is
+ * `fleetStagesQuery(IN_USE_STAGES, NO_LINE)` written out, one clause per stage in use, as IN_SERVICE_ON_ENDED_LINE is.
  */
-export const IN_SERVICE_UNBILLED = `install_status=${STAGE_FIELDS.in_service.installStatus}^substatusISEMPTY^${NO_LINE}^${FLEET_CONDITION}`
+export const IN_SERVICE_UNBILLED = `install_status=${STAGE_FIELDS.in_service.installStatus}^substatusISEMPTY^${NO_LINE}^${FLEET_CONDITION}^NQinstall_status=${STAGE_FIELDS.temporary_deployment.installStatus}^substatus=${STAGE_FIELDS.temporary_deployment.substatus}^${NO_LINE}^${FLEET_CONDITION}`
 
 const ON_ENDED_LINE = `x_daas_ham_subscription_line.status=${SUBSCRIPTION_LINE_STATUS.ended}^ORx_daas_ham_subscription_line.end_date<javascript:gs.beginningOfToday()`
 

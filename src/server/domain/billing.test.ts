@@ -361,14 +361,17 @@ describe('IN_SERVICE_UNBILLED', () => {
     const flagged = (asset: SampleRecord) => matches(IN_SERVICE_UNBILLED, asset)
     const unbilled = (stage: Stage, fields: SampleRecord = {}) => assetIn(stage, { x_daas_ham_fleet: 'true', x_daas_ham_subscription_line: '', ...fields })
 
-    it('flags fleet assets in service on no Subscription line', () => {
-        expect(ALL_STAGES.filter((stage) => flagged(unbilled(stage)))).toEqual(['in_service'])
+    it('flags fleet assets in a billed stage on no Subscription line, a temporary deployment as one in service', () => {
+        expect(flagged(unbilled('temporary_deployment'))).toBe(true)
+        expect(ALL_STAGES.filter((stage) => flagged(unbilled(stage)))).toEqual([...IN_USE_STAGES])
     })
 
-    it("leaves out an asset on a line, and the Provider IT's (ADR 0016)", () => {
-        expect(flagged(unbilled('in_service', { x_daas_ham_subscription_line: 'sl1' }))).toBe(false)
-        expect(flagged(unbilled('in_service', { x_daas_ham_fleet: 'false' }))).toBe(false)
-        expect(flagged(unbilled('in_service', { x_daas_ham_fleet: '' }))).toBe(false)
+    it("leaves out an asset on a line, and the Provider IT's (ADR 0016), in either billed stage", () => {
+        for (const stage of IN_USE_STAGES) {
+            expect(flagged(unbilled(stage, { x_daas_ham_subscription_line: 'sl1' })), stage).toBe(false)
+            expect(flagged(unbilled(stage, { x_daas_ham_fleet: 'false' })), stage).toBe(false)
+            expect(flagged(unbilled(stage, { x_daas_ham_fleet: '' })), stage).toBe(false)
+        }
     })
 })
 
