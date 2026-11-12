@@ -271,9 +271,11 @@ function notRaised(reason: NotRaised, why: string): RequestOutcome {
  * `returnRequestFindings`): the producer does not apply that rule and its Customer and Site are only qualified in the
  * browser, and locations have no visibility rule (ADR 0005), so any location's sys_id is found. All of that is checked
  * before the Site's devices are read. A site decommission returns everything installed or shipped at the Site
- * (domain/returns `stagesTakenBack`); a device removal the listed fleet assets (ADR 0016) deployed at the Site,
- * as a list qualified in the browser, or sent to the API, may name any Asset. The Return runs under the Agreement of
- * its first Asset unless the produced Return order names one.
+ * (domain/returns `stagesTakenBack`) that the requester may see (platform/installed-assets `visibleToReader`, ADR
+ * 0005): a Customer admin's leaves a unit of another Customer, or of none, at the Site where it is. A device removal
+ * returns the listed fleet assets (ADR 0016) deployed at the Site, as a list qualified in the browser, or sent to
+ * the API, may name any Asset. The Return runs under the Agreement of its first Asset unless the produced Return
+ * order names one.
  *
  * A request that names nothing to bring back is refused when it has saved nothing yet, so the customer page leaves no
  * empty Return behind. The producer's Return order is saved already: it is filled in and, with no line, closes at once
@@ -297,7 +299,9 @@ export function requestReturn(request: RequestedEquipment): RequestOutcome {
 function raiseRequested(request: RequestedEquipment, site: GlideRecord | null): RequestOutcome {
     const { produced, customerId, siteId } = request
     const trigger = requestedTrigger(request.decommission)
-    const requested = isSiteRecovery(trigger) ? installedAssetIds({ siteId, stages: stagesTakenBack(trigger) }) : fleetAssetsAt(siteId, request.listedAssetIds)
+    const requested = isSiteRecovery(trigger)
+        ? installedAssetIds({ siteId, stages: stagesTakenBack(trigger), visibleToReader: true })
+        : fleetAssetsAt(siteId, request.listedAssetIds)
     if (!produced && requested.length === 0) {
         return notRaised('nothing', request.decommission ? 'The site has no installed devices' : "Choose at least one of the site's devices")
     }

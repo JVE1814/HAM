@@ -3,6 +3,7 @@ import { appendTo } from '../domain/collections.ts'
 import { fleetStagesQuery } from '../domain/fleet.ts'
 import { INSTALLED_STAGES, type Stage } from '../domain/lifecycle.ts'
 import { str } from './records.ts'
+import { visibleQuery } from './visibility.ts'
 
 interface InstalledFilter {
     agreementId?: string
@@ -10,6 +11,11 @@ interface InstalledFilter {
     orderId?: string
     /** The stages listed: a Return passes those it takes back (domain/returns `stagesTakenBack`). */
     stages?: readonly Stage[]
+    /**
+     * Keep the list to what the signed-in user may see (platform/visibility `visibleQuery`, ADR 0005): for a read made
+     * for a restricted user, whose before-query rule narrows the last `^NQ` clause of the stages only.
+     */
+    visibleToReader?: boolean
 }
 
 /**
@@ -39,8 +45,9 @@ function queryInstalled(filter: InstalledFilter): GlideRecord {
     ]
         .filter(Boolean)
         .join('^')
+    const installed = fleetStagesQuery(filter.stages ?? INSTALLED_STAGES, base)
     const asset = new GlideRecord('alm_hardware')
-    asset.addEncodedQuery(fleetStagesQuery(filter.stages ?? INSTALLED_STAGES, base))
+    asset.addEncodedQuery(filter.visibleToReader ? visibleQuery('alm_hardware', installed) : installed)
     asset.query()
     return asset
 }

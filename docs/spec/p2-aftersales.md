@@ -117,7 +117,11 @@ is never replaced, returned, refreshed, declared missing, charged for or dispose
 - A site decommission returns everything installed at the Site (in service, temporary, pending in
   service), whatever devices the request lists. From the record producer and the customer page it
   also returns units still shipped to the Site (`domain/returns.ts` `stagesTakenBack`), so none
-  is left holding the site package open.
+  is left holding the site package open. A requested decommission returns the units its requester
+  may see: the read carries their visibility filter in each stage's clause (`platform/visibility`
+  `visibleQuery`, ADR 0005). A Customer admin's decommission therefore leaves a unit at the Site
+  whose company is another Customer's, or blank (a data gap), off the Return. Staff see every
+  Customer and return everything at the Site.
 - Devices chosen for a device removal must be fleet assets deployed at the chosen Site (shipped,
   pending in service, in service, temporary or pending return); others are ignored, so a unit
   declared missing, which keeps its Site, is never charged a second lost-asset fee.

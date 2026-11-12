@@ -96,3 +96,37 @@ describe("a Customer admin's device removal", () => {
         expect(rows(FEES).filter((fee) => fee.fee_type === 'lost' && fee.asset === 'a1')).toHaveLength(1)
     })
 })
+
+describe("a Customer admin's site decommission", () => {
+    beforeEach(() => {
+        platform.user = { id: 'u1', name: 'Ada', company: 'acme', roles: ['x_daas_ham.customer_admin'], interactive: true }
+        platform.creatable = () => true
+        platform.defaults[RETURN_LINES] = () => ({ status: RETURN_LINE_STATUS.awaiting })
+        platform.references = { [`${RETURN_LINES}.return_order`]: RETURNS, [`${RETURNS}.agreement`]: 'x_daas_ham_agreement' }
+        platform.tables.cmn_location = [{ sys_id: 'site1', name: 'HQ', company: 'acme', x_daas_ham_is_site: 'true' }]
+        platform.tables.x_daas_ham_agreement = [{ sys_id: 'ag1', overdue_return_days: '10' }]
+    })
+
+    const decommission = () => requestReturn({ customerId: 'acme', siteId: 'site1', decommission: true, listedAssetIds: [], method: 'ship_back', describe: (site) => `Decommission of ${site}` })
+    const returning = (): string[] => rows(RETURN_LINES).map((line) => line.asset)
+
+    it("takes back the Customer's own units at the Site, in every stage it recovers", () => {
+        platform.tables.alm_hardware = [
+            { ...unit('in_service'), sys_id: 'a1', company: 'acme' },
+            { ...unit('shipped'), sys_id: 'a2', company: 'acme' },
+        ]
+        expect(decommission()).toEqual({ raised: true, number: 'RET0002', lines: 2 })
+        expect(returning().sort()).toEqual(['a1', 'a2'])
+    })
+
+    it("leaves a unit at the Site that is another Customer's, or no Customer's, off the Return, whatever its stage", () => {
+        platform.tables.alm_hardware = [
+            { ...unit('in_service'), sys_id: 'a1', company: 'acme' },
+            { ...unit('shipped'), sys_id: 'b1', company: 'other' },
+            { ...unit('in_service'), sys_id: 'b2', company: 'other' },
+            { ...unit('in_service'), sys_id: 'b3', company: '' },
+        ]
+        expect(decommission()).toEqual({ raised: true, number: 'RET0002', lines: 1 })
+        expect(returning()).toEqual(['a1'])
+    })
+})

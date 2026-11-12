@@ -17,7 +17,7 @@ untracked `.audit/` folder, which plan 001 fixes. Every other plan depends on 00
 | [002](002-breakfix-account-check.md) | Refuse a replacement for a failed asset that is not the case account's | P1 | S | 001 | DONE |
 | [003](003-margin-costs-without-customer.md) | Count a margin cost that names no Customer, and pin the margin writes with tests | P1 | S | 001 | DONE |
 | [004](004-route-error-retry.md) | Make "Try again" on a failed page reload the page | P1 | S | 001 | DONE |
-| [005](005-decommission-visible-query.md) | Keep a requested site decommission to the units its requester may see | P1 | S | 001 | TODO |
+| [005](005-decommission-visible-query.md) | Keep a requested site decommission to the units its requester may see | P1 | S | 001 | DONE |
 | [006](006-labour-cost-field-acl.md) | Keep a work order's labour cost to provider staff, and its edits to asset managers and finance | P2 | S | 001 | TODO |
 | [007](007-dashboard-widget-audience.md) | Offer a dashboard widget only to the roles that read its table | P2 | S | 001 | TODO |
 | [008](008-job-run-locks.md) | Hold a run lock in the lease review, attestation and overdue-return jobs | P2 | S | 001 | TODO |
