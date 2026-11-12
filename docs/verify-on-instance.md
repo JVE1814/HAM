@@ -300,7 +300,7 @@ its rows: give each NaaS stockroom an *Assignment group* holding its techs.
 
 ### Inventory tech access
 
-Also after upgrading an existing install. The ACLs that `security/acls*.now.ts` give `BROAD_STAFF`
+Also after upgrading an existing install. The ACLs that each feature's `access.now.ts` gives `BROAD_STAFF`
 (agreements, subscription lines, catalog entries, site templates, fee events, attestations, leases,
 OEM coverage and cloud accounts, model data, device events, reconciliation exceptions, ...) no
 longer list `x_daas_ham.inventory_tech` in `sys_security_acl_role`. Impersonating an
