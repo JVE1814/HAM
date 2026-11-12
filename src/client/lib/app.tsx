@@ -1,5 +1,5 @@
 import { MutationCache, QueryClient, QueryClientProvider, type QueryKey } from '@tanstack/react-query'
-import { createHashHistory, createRouter, RouterProvider, type AnyRoute, type ErrorComponentProps } from '@tanstack/react-router'
+import { createHashHistory, createRouter, RouterProvider, useRouter, type AnyRoute, type ErrorComponentProps } from '@tanstack/react-router'
 import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import { toast } from 'sonner'
@@ -11,6 +11,7 @@ import { Spinner } from '@/components/ui/spinner'
 import { TooltipProvider } from '@/components/ui/tooltip'
 import { ApiError } from '../api'
 import '../app.css'
+import { retryRoute } from './retry'
 
 /**
  * What a mutation says about itself, read by the one MutationCache below: `done` is the toast on success, `refresh`
@@ -43,8 +44,9 @@ export function Failure({ error, reset }: { error: unknown; reset?: () => void }
     )
 }
 
-function RouteError({ error, reset }: ErrorComponentProps) {
-    return <Failure error={error} reset={reset} />
+function RouteError({ error }: ErrorComponentProps) {
+    const router = useRouter()
+    return <Failure error={error} reset={() => void retryRoute(router)} />
 }
 
 function Pending() {
