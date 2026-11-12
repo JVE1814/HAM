@@ -56,7 +56,8 @@
 On hardware, the app's own Provider columns (support cost, claim code and lease) are read by provider staff alone,
 whoever reads the Asset, and a Customer contact does not read a fleet asset's *Cost*, which Customer Service's
 ACLs grant its contacts, nor a Shipment's carrier cost (`fleet/access.now.ts`,
-`delivery/access.now.ts`).
+`delivery/access.now.ts`). A work order's *NaaS field labour cost* is read by provider staff alone, whoever reads
+the work order, and changed by hand by asset managers and finance (`margin/margin.now.ts`).
 
 An inventory tech's stockrooms are the NaaS stockrooms whose *Assignment group* (the platform's
 `alm_stockroom.assignment_group`) is a group they are a member of (ADR 0018).

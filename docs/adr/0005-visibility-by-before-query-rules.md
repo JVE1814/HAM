@@ -104,7 +104,9 @@ Asset passes, left to the platform. The app's own columns on hardware have Allow
 Agreement, subscription line, lease and Legal owner are changed by hand by asset managers, the Fleet flag by
 administrators, and the Provider's figures (support cost, claim code, lease) are read by provider staff only.
 A Customer contact does not read a fleet asset's cost, which Customer Service's ACLs grant its contacts, nor a
-Shipment's carrier cost. Each Deny-Unless field ACL sits beside an Allow-If ACL of its own name (the platform's, or,
+Shipment's carrier cost. A work order's NaaS field labour cost, the app's column on the platform's `wm_order`, has
+Allow-If field ACLs of its own too: provider staff read it, and asset managers and finance change it by hand
+(`margin/margin.now.ts`). Each Deny-Unless field ACL sits beside an Allow-If ACL of its own name (the platform's, or,
 for `alm_asset.cost` write, one repeating `alm_asset.*`'s), so no verdict depends on how the platform matches ACLs
 across levels. The app's own logic saves through GlideRecord, which no ACL checks.
 
@@ -136,7 +138,8 @@ across levels. The app's own logic saves through GlideRecord, which no ACL check
   leaving them in place.
 - A server script's GlideRecord is not checked by ACLs. A read the app makes for a restricted user and returns to them,
   if it has `^NQ` clauses, carries the user's filter in each clause itself: it runs through `platform/visibility`
-  `visibleQuery`, which ANDs the reader's `visibilityFilter` into each clause (the customer page's equipment).
+  `visibleQuery`, which ANDs the reader's `visibilityFilter` into each clause (the customer page's equipment, and
+  the units a requested site decommission takes back, `platform/installed-assets` `visibleToReader`).
 - What only an instance can confirm (a Deny-Unless ACL with no role and a module function as its script, on a parent
   table, applying to its child table's records; *Applies To* on `alm_asset`; the row check on a New form; the field
   ACLs on `alm_asset` applying to an `alm_asset` list's hardware rows; a create rule's script seeing the posted values

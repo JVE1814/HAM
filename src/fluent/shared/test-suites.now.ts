@@ -2,6 +2,7 @@ import '@servicenow/sdk/global'
 import { TestSuite } from '@servicenow/sdk/core'
 import {
     customerAdminVisibilityTest,
+    customerRoutesOtherCustomerTest,
     inventoryTechAuditScanTest,
     inventoryTechAuditVisibilityTest,
     inventoryTechVisibilityTest,
@@ -23,6 +24,7 @@ import { trackingWebhookTest } from '../delivery/tests.now'
 import { leasedAssetOwnershipTest, leaseExtensionTest } from '../leases/tests.now'
 import { closedBillingPeriodLockedTest } from '../billing/tests.now'
 import { rackPowerBudgetTest } from '../racks/tests.now'
+import { jobLockTest } from '../operations/tests.now'
 
 export const phase1Suite = TestSuite({
     $id: Now.ID['atf_suite_p1'],
@@ -40,13 +42,14 @@ export const phase1Suite = TestSuite({
         inventoryTechAuditScanTest,
         cancelRefusedOnceShippedTest,
         sparePoolTopUpTest,
+        jobLockTest,
     ],
 })
 
 export const phase2Suite = TestSuite({
     $id: Now.ID['atf_suite_p2'],
     name: 'NaaS - P2',
-    tests: [replacementWithinAgreementTest, returnEvaluationTest, customerReturnRequestTest, lostInTransitResourcingTest],
+    tests: [replacementWithinAgreementTest, returnEvaluationTest, customerReturnRequestTest, customerRoutesOtherCustomerTest, lostInTransitResourcingTest],
 })
 
 export const phase3Suite = TestSuite({

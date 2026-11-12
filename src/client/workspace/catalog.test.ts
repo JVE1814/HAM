@@ -14,6 +14,8 @@ const onShared = <T extends { table: string }>(found: readonly T[]) => found.fil
 const fieldsOf = (columns: readonly string[]): Field[] =>
     columns.map((name) => ({ name, label: name, kind: 'text', references: null, searchAs: name, sortable: true }))
 
+const holding = (...roles: string[]) => ({ holdsAny: (group: readonly string[]) => group.some((role) => roles.includes(role)) })
+
 const VIEW: ListView = { page: 0, size: 50, sort: null, search: '' }
 const HOSTILE_VIEWS: ListView[] = [
     VIEW,
@@ -63,7 +65,6 @@ describe('the workspace catalog', () => {
     })
 
     it('offers a session only the lists and tabs of the audiences it holds', () => {
-        const holding = (...roles: string[]) => ({ holdsAny: (group: readonly string[]) => group.some((role) => roles.includes(role)) })
         const tech = holding(ROLE.inventoryTech)
         expect(menuFor(tech).flatMap((category) => category.lists).every((list) => list.audience === 'staff')).toBe(true)
         expect(tabsFor(tech).map((tab) => tab.id)).not.toContain('margin')
@@ -93,6 +94,18 @@ describe('the workspace dashboard', () => {
             expect(widget.drill && listById(widget.drill)?.filter, widget.id).toBe(widget.drill ? widget.source.filter : undefined)
             expect(Boolean(widget.drill), widget.id).toBe(Boolean(same))
         }
+    })
+
+    it('offers a role only the widgets on tables it reads, and no tab left without one', () => {
+        const widgetsFor = (...roles: string[]) => tabsFor(holding(...roles)).flatMap((tab) => tab.widgets.map((widget) => widget.id))
+        const broadStaffOnly = ['pending_lines', 'lines_by_customer', 'open_exceptions', 'exception_types']
+        const forTech = widgetsFor(ROLE.inventoryTech)
+        for (const id of broadStaffOnly) expect(forTech, id).not.toContain(id)
+        expect(forTech).toEqual(expect.arrayContaining(['open_orders', 'unbilled_in_service', 'ended_line_in_service', 'past_support', 'open_returns', 'phase']))
+        expect(widgetsFor(ROLE.noc)).toEqual(expect.arrayContaining(broadStaffOnly))
+        expect(widgetsFor(ROLE.finance)).toEqual(WIDGETS.map((widget) => widget.id))
+        expect(tabsFor(holding(ROLE.admin))).toEqual([])
+        for (const tab of tabsFor(holding(ROLE.inventoryTech))) expect(tab.widgets.length, tab.id).toBeGreaterThan(0)
     })
 
     it('never sums an amount without its currency', () => {

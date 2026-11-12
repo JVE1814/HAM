@@ -9,6 +9,7 @@ import type {
     ReturnRequestBody,
     ReturnRequestReceipt,
 } from '../domain/rest-contracts.ts'
+import { sentDeviceList, uniqueIds } from '../domain/customer-requests.ts'
 import { actsAsCustomerAdmin } from '../domain/visibility.ts'
 import { CUSTOMER_PAGE_USERS } from '../domain/roles.ts'
 import {
@@ -39,10 +40,12 @@ function allowed(response: RESTAPIResponse): boolean {
 export function customerOverview(request: RESTAPIRequest, response: RESTAPIResponse): void {
     if (!allowed(response)) return
     const session = currentSession()
+    const equipment = customerEquipment()
     reply(response, 200, {
         customer: customerName(session.customerId),
         isCustomerAdmin: actsAsCustomerAdmin(session.scope),
-        assets: customerEquipment(),
+        assets: equipment.assets,
+        assetsTruncated: equipment.truncated,
         orders: ordersUnderWay(),
         returns: openReturns(),
         attestations: openAttestations(),
@@ -77,7 +80,9 @@ export function answerAttestation(request: RESTAPIRequest, response: RESTAPIResp
     const attestation = findUnclosedAttestation(pathParam(request, 'id'))
     if (!attestation) return reply(response, 404, { error: 'No open attestation' })
     const input = bodyOf<AttestationAnswers>(request)
-    const refused = saveAttestationAnswers(attestation, Array.isArray(input.items) ? (input.items as AttestationAnswer[]) : [])
+    const answers = sentDeviceList(input.items)
+    if ('error' in answers) return reply(response, 400, { error: answers.error })
+    const refused = saveAttestationAnswers(attestation, answers.list as AttestationAnswer[])
     if (refused > 0) return reply(response, 422, { error: `${refused} answer(s) not saved: the platform refused them` })
     if (input.submit === true) {
         if (hasUnansweredItems(attestation)) return reply(response, 409, { error: 'Answer every device before submitting' })
@@ -93,11 +98,13 @@ export function requestCustomerReturn(request: RESTAPIRequest, response: RESTAPI
     const session = currentSession()
     if (!actsAsCustomerAdmin(session.scope)) return reply(response, 403, { error: 'Only customer admins can request returns' })
     const input = bodyOf<ReturnRequestBody>(request)
+    const listed = sentDeviceList(input.assets)
+    if ('error' in listed) return reply(response, 400, { error: listed.error })
     const outcome = requestReturn({
         customerId: session.customerId,
         siteId: String(input.site ?? ''),
         decommission: input.decommission === true,
-        listedAssetIds: (Array.isArray(input.assets) ? (input.assets as unknown[]) : []).map(String),
+        listedAssetIds: uniqueIds(listed.list),
         method: input.method === 'fsm_deinstall' ? 'fsm_deinstall' : 'ship_back',
         describe: (siteName) => `Customer return request from ${siteName}`,
     })

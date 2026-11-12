@@ -2,6 +2,16 @@ import js from '@eslint/js'
 import tseslint from 'typescript-eslint'
 import globals from 'globals'
 import nowConfig from './now.config.json' with { type: 'json' }
+import { execFileSync } from 'node:child_process'
+
+/** What git ignores is no source: .gitignore, .git/info/exclude and the user's own excludes, so a scratch folder needs no entry here. */
+const GIT_IGNORED = execFileSync('git', ['ls-files', '--others', '--ignored', '--exclude-standard', '--directory', '-z'], {
+    cwd: import.meta.dirname,
+    encoding: 'utf8',
+})
+    .split('\0')
+    .filter(Boolean)
+    .map((path) => (path.endsWith('/') ? `${path}**` : path))
 
 /**
  * The instance stores each server module as a sys_module whose path ends in ".ts" and resolves an import by that exact
@@ -29,11 +39,8 @@ const STATIC_IMPORTS = { selector: 'ImportExpression', message: 'A server module
 export default tseslint.config(
     {
         ignores: [
-            'node_modules/**',
+            ...GIT_IGNORED,
             '.claude/**',
-            'dist/**',
-            'target/**',
-            '.now/**',
             '@types/**',
             'src/fluent/generated/**',
             'now.prebuild.mjs',

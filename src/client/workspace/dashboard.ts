@@ -7,7 +7,7 @@ import { OPEN_EXCEPTIONS_QUERY } from '../../server/domain/reconciliation'
 import { SUBSCRIPTION_LINE_STATUS } from '../../server/domain/vocabulary'
 import type { Session } from '../lib/session'
 import type { Money, Source } from '../lib/sn'
-import { AUDIENCE, type Audience, type ListId } from './catalog'
+import { AUDIENCE, listById, type Audience, type ListId } from './catalog'
 
 /*
  * alm_hardware also holds the Provider IT's equipment (ADR 0016), so every source on it counts fleet assets only: its
@@ -24,6 +24,8 @@ interface WidgetBase {
     span: 3 | 4 | 6 | 12
     /** The list of the rows this widget counts: same table, same filter. */
     drill?: ListId
+    /** Who reads the widget's table, when not everyone the tab is offered to does and no `drill` list says so. */
+    audience?: Audience
 }
 
 /**
@@ -135,6 +137,7 @@ export const DASHBOARD: readonly DashboardTab[] = [
                 title: 'Subscription lines not yet started',
                 span: 3,
                 source: { table: 'x_daas_ham_subscription_line', filter: `status=${SUBSCRIPTION_LINE_STATUS.pending}` },
+                audience: 'broadStaff',
             },
             {
                 id: 'lines_by_customer',
@@ -145,6 +148,7 @@ export const DASHBOARD: readonly DashboardTab[] = [
                 title: 'Active subscription lines by customer',
                 span: 3,
                 source: { table: 'x_daas_ham_subscription_line', filter: `status=${SUBSCRIPTION_LINE_STATUS.active}` },
+                audience: 'broadStaff',
             },
         ],
     },
@@ -259,6 +263,17 @@ export const DASHBOARD: readonly DashboardTab[] = [
     },
 ]
 
+/**
+ * Who a widget is offered to within its tab: its own audience, else its drill list's, else the tab's. A widget on a
+ * table some of the tab's roles cannot read would show them a failure, not a count.
+ */
+export function widgetAudience(tab: DashboardTab, widget: Widget): Audience {
+    return widget.audience ?? (widget.drill && listById(widget.drill)?.audience) ?? tab.audience
+}
+
+/** The tabs `session` is offered, each with the widgets it is offered; a tab with none is left out. */
 export function tabsFor(session: Session): readonly DashboardTab[] {
     return DASHBOARD.filter((tab) => session.holdsAny(AUDIENCE[tab.audience]))
+        .map((tab) => ({ ...tab, widgets: tab.widgets.filter((widget) => session.holdsAny(AUDIENCE[widgetAudience(tab, widget)])) }))
+        .filter((tab) => tab.widgets.length > 0)
 }

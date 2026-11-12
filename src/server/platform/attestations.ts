@@ -1,6 +1,8 @@
 import { GlideRecord, gs } from '@servicenow/glide'
 import { ATTESTATION_STATE, attestationDue } from '../domain/audit.ts'
 import { fleetStagesQuery } from '../domain/fleet.ts'
+import type { HeldLock } from '../domain/job-lock.ts'
+import { LOCK } from '../domain/lock-names.ts'
 import type { AttestationAnswers } from '../domain/rest-contracts.ts'
 import { ATTESTATION_RESPONSE_CHOICES, type AttestationResponse } from '../domain/vocabulary.ts'
 import { ACTIVE_AGREEMENTS } from './agreements.ts'
@@ -10,6 +12,7 @@ import { openException } from './exceptions.ts'
 import { bool, exists, findById, num, refusal, str, warnRefused } from './records.ts'
 import type { Sent } from './rest-api.ts'
 import { installedAssetIds } from './installed-assets.ts'
+import { withLock } from './locks.ts'
 import { IN_USE_STAGES } from '../domain/lifecycle.ts'
 import { log } from './log.ts'
 
@@ -31,9 +34,19 @@ export const OPEN_ATTESTATIONS = 'active=true'
  * Open an attestation for each Site with fleet assets of an attesting Agreement, once none is open there and the last
  * one was attested longer ago than the Agreement's interval (or never). One attestation covers every fleet asset
  * installed at the Site, so a Site that several Agreements serve follows the shortest of their intervals; the
- * attestation records the Agreement whose interval raised it.
+ * attestation records the Agreement whose interval raised it. Two runs at once (the scheduled job and an *Execute now*)
+ * would both find a Site with none open and open one each, so a run holds a job lock (ADR 0013) throughout; one that
+ * finds it held opens nothing and logs so. Taking the lock throws only when an insert is refused with no lock row
+ * (platform/locks): that error escapes.
  */
 export function raiseDueAttestations(): void {
+    const lockName = LOCK.attestationRun()
+    if (withLock(lockName, raiseHolding).ran) return
+    log.info(`Attestations not raised: another run holds the ${lockName} lock and raises them`)
+}
+
+/** The run, holding its `lock`. One that outlasts it (ADR 0013) opens no attestation once it has lost it. */
+function raiseHolding(lock: HeldLock): void {
     const today = todayIso()
     const agreement = new GlideRecord('x_daas_ham_agreement')
     agreement.addEncodedQuery(ACTIVE_AGREEMENTS)
@@ -49,6 +62,7 @@ export function raiseDueAttestations(): void {
             if (exists(ATTESTATION, `site=${siteId}^${OPEN_ATTESTATIONS}`)) continue
             const last = lastAttestedOn(siteId)
             if (!attestationDue({ lastAttestedOn: last, intervalMonths: num(agreement, 'attestation_interval_months'), today })) continue
+            if (!lock.held()) return void log.warn('Attestation run stopped, its lock lost: the run that took it over raises the rest')
             openAttestation(agreement, siteId)
         }
     }

@@ -49,6 +49,14 @@ export interface ListView {
     search: string
 }
 
+/**
+ * The page of `view` to show of `total` rows: its own, or the last one with rows when the list has shrunk since the
+ * address was written (a work queue does, and Back returns to `?page=2` of it).
+ */
+export function pageWithin(view: ListView, total: number): number {
+    return Math.min(view.page, Math.max(0, Math.ceil(total / view.size) - 1))
+}
+
 /** The classic form of a record, which carries every UI action and all form logic. */
 export function recordHref(table: string, id: string): string {
     return `/${table}.do?sys_id=${encodeURIComponent(id)}`

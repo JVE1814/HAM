@@ -13,6 +13,7 @@ import {
     stillCovered,
 } from '../domain/leases.ts'
 import { isRetired, SERVING_STAGES, type Stage, STOCK_STAGES } from '../domain/lifecycle.ts'
+import { LOCK } from '../domain/lock-names.ts'
 import { isFree } from '../domain/stock.ts'
 import { type DisposalMethod, LEASE_END_ACTION, type LeaseEndAction, LEGAL_OWNER, TASK_STATE } from '../domain/vocabulary.ts'
 import { assetManagerIds } from './users.ts'
@@ -22,6 +23,7 @@ import { todayIso } from './clock.ts'
 import { fire, queueJob, type JobEvent } from './events.ts'
 import { EVENT } from '../domain/events.ts'
 import { queueRefresh } from './lifecycle-dates.ts'
+import { withLock } from './locks.ts'
 import { stringProperty } from './properties.ts'
 import { PROPERTY } from '../domain/properties.ts'
 import { bool, count, exists, findById, num, refusal, str, warnRefused, type ForeignRecord } from './records.ts'
@@ -49,9 +51,19 @@ export function giveToLessor(current: ForeignRecord): void {
 
 /**
  * Flag leases that end before the service they support, raise decisions ahead of lease ends, and queue the transfer
- * again for a bought-out lease that still has Assets (an update was refused): the daily review.
+ * again for a bought-out lease that still has Assets (an update was refused): the daily review. Two runs at once (the
+ * scheduled job and an *Execute now*) would both find a lease with no open decision and raise one each, so a run holds
+ * a job lock (ADR 0013) throughout; one that finds it held reviews nothing and logs so. Taking the lock throws only
+ * when an insert is refused with no lock row (platform/locks): that error escapes.
  */
 export function runLeaseReview(): void {
+    const lockName = LOCK.leaseReviewRun()
+    if (withLock(lockName, reviewHolding).ran) return
+    log.info(`Leases not reviewed: another run holds the ${lockName} lock and reviews them`)
+}
+
+/** The review, holding the run's `lock`. A run that outlasts it (ADR 0013) raises no decision once it has lost it. */
+function reviewHolding(lock: HeldLock): void {
     resumeBuyouts()
     const today = todayIso()
     const lease = new GlideRecord(LEASE)
@@ -68,7 +80,9 @@ export function runLeaseReview(): void {
             if (!lease.update()) warnRefused(lease, `Lease ${str(lease, 'number')} mismatch flag not saved`)
             if (mismatch) fire(EVENT.leaseMismatch, lease, assetManagerIds().join(','))
         }
-        if (withinLead(str(lease, 'ends'), today, num(lease, 'decision_lead_days')) && !openDecision(leaseId)) raiseDecision(lease, mismatch)
+        if (!withinLead(str(lease, 'ends'), today, num(lease, 'decision_lead_days')) || openDecision(leaseId)) continue
+        if (!lock.held()) return void log.warn('Lease review stopped, its lock lost: the run that took it over raises the rest')
+        raiseDecision(lease, mismatch)
     }
 }
 

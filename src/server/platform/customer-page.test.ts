@@ -18,10 +18,12 @@ function signIn(roles: string[]): void {
 
 function listedStages(fields: Record<string, string>): Stage[] {
     platform.tables.alm_hardware = ALL_STAGES.map((stage) => ({ sys_id: stage, ...assetIn(stage, fields) }))
-    return customerEquipment().map((asset) => asset.stage as Stage)
+    return customerEquipment().assets.map((asset) => asset.stage as Stage)
 }
 
 const OWN = { x_daas_ham_fleet: 'true', company: 'cust1', x_daas_ham_site: 'site1' }
+
+const fleetOf = (count: number) => Array.from({ length: count }, (_, i) => ({ sys_id: `asset${i}`, ...assetIn('in_service', OWN) }))
 
 beforeEach(() => platform.reset())
 
@@ -51,5 +53,21 @@ describe('customerEquipment', () => {
     it('shows staff previewing the page every Customer', () => {
         signIn(['x_daas_ham.asset_manager'])
         expect(listedStages({ ...OWN, company: 'cust9', x_daas_ham_site: 'site9' }).sort()).toEqual([...DEPLOYED].sort())
+    })
+
+    it('lists every device and says the list is whole, up to its limit', () => {
+        signIn(['x_daas_ham.customer_admin'])
+        platform.tables.alm_hardware = fleetOf(5000)
+        const equipment = customerEquipment()
+        expect(equipment.assets).toHaveLength(5000)
+        expect(equipment.truncated).toBe(false)
+    })
+
+    it('lists the first 5000 devices and says there are more', () => {
+        signIn(['x_daas_ham.customer_admin'])
+        platform.tables.alm_hardware = fleetOf(5001)
+        const equipment = customerEquipment()
+        expect(equipment.assets).toHaveLength(5000)
+        expect(equipment.truncated).toBe(true)
     })
 })

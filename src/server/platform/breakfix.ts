@@ -1,5 +1,5 @@
 import type { GlideRecord } from '@servicenow/glide'
-import { replacementProblem, replacementStep } from '../domain/breakfix.ts'
+import { isAnotherCustomers, replacementProblem, replacementStep } from '../domain/breakfix.ts'
 import { ORDER_STAGE, type OrderStage } from '../domain/vocabulary.ts'
 import { isFleetAsset, readStage } from './assets.ts'
 import { log } from './log.ts'
@@ -27,12 +27,15 @@ export type Replacement =
 
 /**
  * Before insert/update rule on cases naming a failed Asset (br_case_failed_asset), wired here: the case takes its
- * customer and service level from the Asset. A failed asset outside the fleet (ADR 0016), set by a script past the
- * field's reference qualifier, gives the case nothing. `current` is the rule's case, which the platform saves.
+ * service level from the Asset and, when it names no account yet, its Customer. A failed asset outside the fleet
+ * (ADR 0016), or another Customer's than the case's account, set past the field's reference qualifier, gives the
+ * case nothing, and Raise replacement refuses it (`raiseReplacement`): the rule sits on a table of another scope,
+ * where it cannot refuse the save. `current` is the rule's case, which the platform saves.
  */
 export function takeFailedAssetTerms(current: ForeignRecord): void {
     const asset = findById('alm_hardware', str(current, 'x_daas_ham_failed_asset'))
     if (!asset || !isFleetAsset(asset)) return
+    if (isAnotherCustomers(str(current, 'account'), str(asset, 'company'))) return
     current.setValue('x_daas_ham_replacement_tier', str(asset, 'x_daas_ham_agreement.replacement_tier'))
     if (!str(current, 'account')) current.setValue('account', str(asset, 'company'))
 }
@@ -60,7 +63,7 @@ export function raiseReplacement(kase: GlideRecord): Replacement {
     }
     const failed = findById('alm_hardware', str(kase, 'x_daas_ham_failed_asset'))
     if (!failed) return notRaised('Set the failed asset on the case first')
-    const problem = replacementProblem({ fleet: isFleetAsset(failed), stage: readStage(failed) })
+    const problem = replacementProblem({ fleet: isFleetAsset(failed), stage: readStage(failed), customerId: str(failed, 'company') }, str(kase, 'account'))
     if (problem) return notRaised(problem)
     const raised = createOrder(
         {

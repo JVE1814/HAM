@@ -154,6 +154,24 @@ now* at once never load the same stalest Assets and both insert a serial's new c
 not updated afterwards would keep a stale coverage end. It holds no other lock when it takes it,
 does not retry, and checks nothing when it finds it held. Under it, it saves coverage records and
 Assets, and every lock their rules take comes later in the order. A run that has lost it starts no further batch.
+The daily lease review holds `lease_review_run` for the whole run, so a run and an *Execute now* at
+once never both find a lease with no open decision and raise one each: the second would stay open
+once the first is applied, could be applied again, and would keep the review from raising the next.
+It holds no other lock when it takes it, does not retry, and reviews nothing when it finds it held.
+Under it, it saves Lease schedules and inserts decisions, whose rules take no lock. A run that has
+lost it raises no further decision.
+The daily attestation run holds `attestation_run` for the whole run, so a run and an *Execute now*
+at once never both find a Site with no open attestation and open one each. It holds no other lock
+when it takes it, does not retry, and opens nothing when it finds it held. Under it, it inserts
+attestations and their items, whose rules take no lock. A run that has lost it opens no further
+attestation.
+The daily chase of overdue returns holds `overdue_returns_run` for the whole run, so a run and an
+*Execute now* at once never both read a Return order as not escalated and notify its Customer
+twice, nor both advance the job's one cursor. It holds no other lock when it takes it, does not
+retry, and chases nothing when it finds it held. Under it, it declares each unit missing under that
+unit's `receive_asset_` lock, with what that takes under it, so it comes before `receive_asset`. A
+run ends on the job time budget (`x_daas_ham.job.budget_seconds`), well short of
+`ABANDONED_AFTER_MINUTES`, so it does not check for a lost lock.
 A unit is put on a Return order under `return_asset_<Asset sys_id>`: the check that it awaits no other
 return and the insert of its line are one critical section, so two Returns raised at once (a request
 sent twice, the record producer beside the customer page or an Agreement's end) never both take it.
@@ -173,13 +191,24 @@ while it is open and on no other period, so a month generating beside a *Regener
 never bills one fee on both. The generation holds no other lock when it takes it, tries `LOCK_TRIES`
 times
 back to back, and counts a fee held through them as failed unless another period has it by then.
-Nothing is taken under it.
+A waiver (a unit declared missing is scanned in at the depot) takes the same lock, under the unit's
+`receive_asset_` lock, and reads the fee's open charges afresh there. A charge on no Billing period
+is waived at once. For a charge on a period, the waiver takes that period's `billing_period_` lock
+under the fee's, the only lock taken under a fee's, and waives the charge only while the period is
+not closed. Each of the two takes is tried `LOCK_TRIES` times back to back. A charge whose lock or
+whose period's lock is held through them, or whose period is closed, stays open and is logged as an
+error, to waive by hand or to credit.
 *Close period* and *Regenerate* of a Billing period run under `billing_period_<period sys_id>`,
 holding no other lock, and each reads the period's status afresh there. So a Regenerate never
 deletes the lines of a period Close is locking, and Close never locks a period a Regenerate has
 emptied. Each tries `LOCK_TRIES` times back to back, and one that finds the lock held through them
 changes
-nothing and asks the user to try again. Nothing is taken under it.
+nothing and asks the user to try again. A fee's waiver takes the lock too, under the fee's lock
+(above), so it lands wholly before a Close, which then takes the waived fee and its line off the
+period, or after it, when it finds the period closed and leaves the fee as the Close billed it. A
+waiver saved in the middle of a Close would otherwise stay on the closed bill (saved after the Close
+took the waived fees off) or be overwritten as billed (saved while the Close marks the fees billed).
+Nothing is taken under it.
 
 An audit's scans and *Close audit* take turns under `audit_<audit sys_id>`, each holding no other
 lock when it takes it, so a scan lands wholly before the close reads the lines, or finds the audit

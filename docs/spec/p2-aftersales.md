@@ -6,9 +6,13 @@ is never replaced, returned, refreshed, declared missing, charged for or dispose
 ## Break-fix (Q46, Q58)
 
 - A CSM case names the **failed asset**, a fleet asset (the field offers fleet assets only). The case
-  takes the Agreement's replacement service level and the Asset's Customer. A failed asset outside the
-  fleet, set past the field's qualifier by a script, gives the case neither, and **Raise replacement**
-  refuses it (*Only a fleet asset is replaced*).
+  takes the Agreement's replacement service level and, when it names no account yet, the Asset's
+  Customer as its account. A failed asset outside the fleet, set past the field's qualifier by a
+  script, gives the case neither, and **Raise replacement** refuses it (*Only a fleet asset is
+  replaced*). A failed asset of another Customer than the case's account gives the case nothing
+  either and leaves its account as it is, and **Raise replacement** refuses it (*The failed asset is
+  not the case account's*): the Order is raised for the Asset's Customer, at its Site
+  (`domain/breakfix.ts` `isAnotherCustomers`).
 - **Raise replacement** (NOC, asset manager, CSM agent) creates a *device replace* Order: one line,
   same Model, *replaces asset* = the failed unit. The Order is submitted at once; one that Submit
   refuses (ordering spec) stays a draft, linked to the case, to correct and submit. If the Order or
@@ -113,7 +117,11 @@ is never replaced, returned, refreshed, declared missing, charged for or dispose
 - A site decommission returns everything installed at the Site (in service, temporary, pending in
   service), whatever devices the request lists. From the record producer and the customer page it
   also returns units still shipped to the Site (`domain/returns.ts` `stagesTakenBack`), so none
-  is left holding the site package open.
+  is left holding the site package open. A requested decommission returns the units its requester
+  may see: the read carries their visibility filter in each stage's clause (`platform/visibility`
+  `visibleQuery`, ADR 0005). A Customer admin's decommission therefore leaves a unit at the Site
+  whose company is another Customer's, or blank (a data gap), off the Return. Staff see every
+  Customer and return everything at the Site.
 - Devices chosen for a device removal must be fleet assets deployed at the chosen Site (shipped,
   pending in service, in service, temporary or pending return); others are ignored, so a unit
   declared missing, which keeps its Site, is never charged a second lost-asset fee.
@@ -133,7 +141,9 @@ is never replaced, returned, refreshed, declared missing, charged for or dispose
     (`domain/billing.ts` `sitePackageHoldersQuery`);
   - a unit received after the due date incurs a **late-return fee**;
   - a unit declared missing that turns up settles its line again: the open lost-asset fee is
-    waived, the late-return fee applies, and the Return order reopens for evaluation.
+    waived, the late-return fee applies, and the Return order reopens for evaluation. A fee on a
+    Billing period that is closed, or that is being closed or regenerated just then, is not waived:
+    it stays open and is logged as an error, to settle by hand (P3 billing, ADR 0013).
 
   A receipt the lifecycle or the platform refuses answers HTTP 422 with the reason and leaves the unit
   pending return (or missing), with nothing settled, to scan again. If the unit is saved but its

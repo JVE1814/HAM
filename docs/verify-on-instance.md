@@ -90,8 +90,9 @@ endsON2028-01-31@javascript:gs.dateGenerate('2028-01-31','start')@javascript:gs.
 
 ### ATF route tests
 
-Suites *NaaS - P1*, *P2* and *P3*. The tests of the customer returns, warehouse and audit scan
-routes call each route's handler from a *Run Server Side Script* step, as the
+Suites *NaaS - P1*, *P2* and *P3*. The tests of the customer returns, fault, install confirmation
+and attestation routes, and of the warehouse and audit scan routes, call each route's handler from
+a *Run Server Side Script* step, as the
 impersonated user, with `require('x_daas_ham/naas-ham/<version>/src/server/entry/<file>.ts')`.
 ATF's inbound REST step signs in through a basic auth profile, which the app's scope may not
 create. Confirm that these steps run (no *require is not defined* or *No module with path*).
@@ -202,6 +203,10 @@ and each run logs them as an error in the system log. Some rows are no scheduled
 differently: `preflight` holds the preflight check's result, `billing_generate_<period sys_id>` a
 billing pass (ADR 0007), `provider_tag_sequence` the Provider tag counter, and `oem_claim_stranded`
 only where the OEM claim run's check for stranded steps goes on from, with no status.
+
+A generator for a dev instance and a timing protocol are drafted in
+[research/scale-test.md](research/scale-test.md), with the prototype in `tools/scale/`. Neither has
+run on an instance, and no threshold is agreed yet.
 
 ## Fleet (ADR 0016)
 
@@ -356,6 +361,16 @@ deletes one. A consumable's cost is still writable as before. Impersonating a Cu
 also holds `sn_customerservice.customer`, `GET /api/now/table/alm_hardware/<their fleet asset>`
 returns no cost, support cost, claim code or lease, and a Shipment returns no cost.
 
+### Work order labour cost
+
+`margin/margin.now.ts`. Impersonating a field-tech-only user, a work order with a *NaaS purpose*
+saves as before (state, work notes), and `PATCH /api/now/table/wm_order/<id>` with
+`{"x_daas_ham_labour_cost":"180"}` does not change its *NaaS field labour cost*. An asset manager
+or a finance user changes it the same way. A user with no NaaS role who reads the work order (a
+dispatcher of the Provider IT) gets no `x_daas_ham_labour_cost` from `GET
+/api/now/table/wm_order/<id>?sysparm_fields=number,x_daas_ham_labour_cost`. Closing the month's
+billing period afterwards still writes the *Field labour* Cost fact from the cost entered.
+
 ### Customer creates
 
 `orders/access.now.ts`, `returns/access.now.ts`. As a customer admin, `POST /api/now/table/x_daas_ham_order` for another
@@ -387,7 +402,7 @@ Customer contact (the page's ACL). Its sidebar offers a role only the lists of i
 (`catalog.ts`), and each list shows what the table's ACLs and before-query rules let the user
 read. As a NOC-only or inventory-tech-only user, Operations,
 Billing integrity and Lifecycle risk show counts and the Margin tab is not offered; an inventory
-tech gets no subscription-line or reconciliation-exception figures. As finance, the Margin tab
+tech is not offered the subscription-line and reconciliation-exception tiles. As finance, the Margin tab
 shows figures, each in its own currency. As a non-admin staff user, *Overdue returns*, *Agreements
 up for renewal* and the Margin tiles (`javascript:gs.…` dates in the query) and *My staging tasks*
 (`assigned_toDYNAMIC`) show rows, and every list has its column labels (`/api/now/ui/meta`).
@@ -486,9 +501,14 @@ with the flag cleared, and its stage can then be set on the form.
 ### How a job lock behaves
 
 A job lock is a row in *Job lock* (`x_daas_ham_job_lock`) named after what it guards, such as
-`receive_asset_<Asset sys_id>`: taking it is one insert, and letting it go deletes the row. Check
-once that *Job lock* shows a unique database index on *Lock*, and that a second row with the same
-name is refused (`GlideRecord.insert()` returns no sys_id) without throwing.
+`receive_asset_<Asset sys_id>`: taking it is one insert, and letting it go deletes the row. The ATF
+test *NaaS - a job lock is one row that only one holder takes* (suite *NaaS - P1*) checks this on
+the instance, under lock names of its own. A second row with the same name is refused
+(`GlideRecord.insert()` returns no sys_id) without throwing. A row made by hand holds the lock
+until it is deleted. A run leaves no row behind, also when its work throws. Confirm that the test
+passes, and check once that *Job lock* shows a unique database index on *Lock*. Check an abandoned
+lock by hand, as below: the instance stamps `sys_created_on` itself on an insert from the app's
+scope, so a test cannot age a row (development instance, 2026-11-12).
 
 Every lock below behaves as follows, which its own check does not repeat:
 
@@ -506,6 +526,9 @@ Every lock below behaves as follows, which its own check does not repeat:
   by the
   next take, which then goes ahead; a fresh one is not cleared.
 - **Nothing left behind.** No lock row is left once the run, request or action that took it ends.
+
+The ATF test checks the second and last of these for the lock itself. What each job, request or
+action does when it finds its lock held, and what it logs, is checked by hand in the sections below.
 
 ### Margin recompute lock
 
@@ -643,6 +666,11 @@ service leaves it open and logs *[x_daas_ham] <serial> left service on <date>, i
 still open: ...* (error). A row named `fee_<type>_<Asset sys_id>_<Return order sys_id>` does the
 same to a line declared missing or a damaged evaluation saved: it logs *[x_daas_ham] <type> fee for
 <serial> not recorded: left to a run holding its lock ...* (warning) and records no fee.
+A row named `billing_period_<sys_id of a period ready for review>` keeps the lost fee of a missing
+unit open when the unit is scanned in at the depot while that fee is on the period: the unit is
+received as usual, and the log shows *[x_daas_ham] lost fee <sys_id> not waived: its Billing
+period's lock is held (a Close, a Regenerate or another waiver); waive it by hand, or credit it if
+its period is closed by then* (error). Delete the row and set the fee to *Waived* by hand.
 
 ### Refresh lock
 
@@ -651,6 +679,17 @@ refresh orders* run holds the job lock `refresh_orders`. With a row of that name
 *Execute now* raises nothing. It logs two *Unique Key violation* errors and *[x_daas_ham] Refresh
 Orders not raised: another run holds the refresh_orders lock and raises them* (info). Delete the
 row and the next run raises them.
+
+### Lease review, attestation and overdue-return run locks
+
+[How a job lock behaves](#how-a-job-lock-behaves). The daily *NaaS - review leases*, *NaaS - raise
+attestations* and *NaaS - chase overdue returns* runs each hold a job lock for the whole run:
+`lease_review_run`, `attestation_run` and `overdue_returns_run`. With a row of that name in *Job
+lock*, *Execute now* on its job does nothing. It logs two *Unique Key violation* errors and
+*[x_daas_ham] Leases not reviewed: another run holds the lease_review_run lock and reviews them*,
+*Attestations not raised: another run holds the attestation_run lock and raises them* or *Overdue
+returns not chased: another run holds the overdue_returns_run lock and chases them* (info). Delete
+the row and the next run does the work.
 
 ### Spare-pool lock
 

@@ -4,7 +4,8 @@ import { AppShell } from '@/components/app-shell'
 import type { AppContext } from '@/lib/app'
 import { stockroomsQuery } from './api'
 import { ModeScreen } from './ModeScreen'
-import { MODES, modesFor, StationProvider } from './station'
+import { MODES, modesFor } from './scans'
+import { StationProvider } from './station'
 
 const rootRoute = createRootRouteWithContext<AppContext>()({
     loader: ({ context }) => context.queryClient.prefetchQuery(stockroomsQuery),

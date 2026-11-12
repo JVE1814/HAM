@@ -12,6 +12,7 @@ import { Failure } from '@/lib/app'
 import { countQuery, fieldsQuery, sumQuery, type Tally } from '@/lib/sn'
 import { cn } from '@/lib/utils'
 import type { Widget } from './dashboard'
+import { tint, topGroups } from './tally'
 
 const SPAN = { 3: 'col-span-12 sm:col-span-6 xl:col-span-3', 4: 'col-span-12 lg:col-span-4', 6: 'col-span-12 lg:col-span-6', 12: 'col-span-12' } as const
 
@@ -62,12 +63,6 @@ function Score({ widget }: { widget: Extract<Widget, { chart: 'score' }> }) {
             {(tally) => <p className="font-heading text-4xl font-semibold tabular-nums">{(tally[0]?.count ?? 0).toLocaleString()}</p>}
         </Loaded>
     )
-}
-
-function topGroups(tally: Tally, top: number, others: boolean): Tally {
-    const rest = tally.slice(top)
-    const shown = tally.slice(0, top)
-    return others && rest.length > 0 ? [...shown, { key: '', label: 'Others', count: rest.reduce((sum, group) => sum + group.count, 0) }] : shown
 }
 
 const COUNT: ChartConfig = { count: { label: 'Count', color: 'var(--chart-1)' } }
@@ -154,15 +149,6 @@ function CurrencyBar({ widget }: { widget: Extract<Widget, { chart: 'currencyBar
             }
         </Loaded>
     )
-}
-
-const TINT = ['bg-chart-1/10', 'bg-chart-1/20', 'bg-chart-1/35', 'bg-chart-1/50', 'bg-chart-1/70']
-const NEGATIVE_TINT = ['bg-destructive/10', 'bg-destructive/20', 'bg-destructive/35', 'bg-destructive/50', 'bg-destructive/70']
-
-function tint(amount: number, largest: number): string {
-    if (!largest || !amount) return ''
-    const step = Math.min(TINT.length - 1, Math.floor((Math.abs(amount) / largest) * TINT.length))
-    return (amount < 0 ? NEGATIVE_TINT : TINT)[step] ?? ''
 }
 
 function CurrencyMatrix({ widget }: { widget: Extract<Widget, { chart: 'currencyMatrix' }> }) {

@@ -57,7 +57,7 @@ import { PROPERTY, type PropertyOf } from './domain/properties'
 import type { ForeignRecord } from './platform/records'
 import { restMessagePort } from './platform/rest-messages'
 import { AUDIENCE, CATEGORIES } from '../client/workspace/catalog'
-import { DASHBOARD } from '../client/workspace/dashboard'
+import { DASHBOARD, widgetAudience } from '../client/workspace/dashboard'
 
 // The wired entry and platform functions this test type-checks, and the REST message port it calls, import Glide. A
 // property reads as its declared value.
@@ -83,7 +83,7 @@ vi.mock('@servicenow/glide/sn_ws', () => ({
         setRequestHeader() {}
         setRequestBody() {}
         execute() {
-            return { getStatusCode: () => 200, getBody: () => JSON.stringify({ sid: 'session', items: [{ id: 'device' }] }) }
+            return { getStatusCode: () => 200, getBody: () => JSON.stringify({ sid: 'session', items: [{ id: 'device', serialNumber: 'SERIAL' }] }) }
         }
     },
 }))
@@ -927,6 +927,20 @@ describe('the rules and ACLs that scope what a reader sees', () => {
         })
     })
 
+    describe("ACLs on a work order's NaaS labour cost", () => {
+        const onField = (operation: string) =>
+            builtAcls().filter((acl) => acl.table === 'wm_order' && acl.field === 'x_daas_ham_labour_cost' && acl.operation === operation)
+
+        it('keep it to provider staff to read, and to asset managers and finance to change, whoever the platform lets into the work order', () => {
+            expect(onField('read').map((acl) => [[...acl.roles].sort(), acl.deny])).toEqual([[PROVIDER_STAFF, false]])
+            expect(onField('write').map((acl) => [[...acl.roles].sort(), acl.deny])).toEqual([[[ROLE.assetManager, ROLE.finance].sort(), false]])
+        })
+
+        it('leave the work order itself to the platform: the app has no record ACL on wm_order', () => {
+            expect(recordAcls().filter((acl) => acl.table === 'wm_order')).toEqual([])
+        })
+    })
+
     describe('create ACLs of Orders, Order lines and Returns', () => {
         const creators = (table: string) => recordAcls().filter((acl) => acl.table === table && acl.operation === 'create')
         const forCustomer = (table: string) => creators(table).filter((acl) => acl.roles.some(isCustomerRole))
@@ -1059,6 +1073,18 @@ describe('the NaaS Asset Workspace', () => {
         for (const table of tables) expect(readsOf(table).length, table).toBeGreaterThan(0)
         for (const table of ['x_daas_ham_margin', 'x_daas_ham_cost_fact']) {
             expect(readsOf(table).map((acl) => [...acl.roles].sort()), table).toEqual([MONEY_READERS])
+        }
+    })
+
+    it('offers each widget only to roles that read its table, so none shows a role a refusal', () => {
+        const rolesOf: Readonly<Record<string, readonly string[]>> = AUDIENCE
+        for (const tab of DASHBOARD) {
+            for (const widget of tab.widgets) {
+                const readers = readsOf(widget.source.table).flatMap((acl) => acl.roles)
+                const offered = (rolesOf[tab.audience] ?? []).filter((role) => rolesOf[widgetAudience(tab, widget)]?.includes(role))
+                expect(offered.length, `${tab.id} ${widget.id}`).toBeGreaterThan(0)
+                expect(offered.filter((role) => !readers.includes(role)), `${tab.id} ${widget.id}`).toEqual([])
+            }
         }
     })
 
@@ -1521,12 +1547,13 @@ describe('ATF tests', () => {
     }
 
     // A step passes or fails by what its script returns. Run here, a script fails only on the reply it checks, which a
-    // stand-in answers HTTP 599: one that fails for another reason, or returns nothing, has an error of its own.
+    // stand-in answers HTTP 599, or on the job lock it probes before it writes, which a stand-in module never says
+    // is free: one that fails for another reason, or returns nothing, has an error of its own.
     it('run their scripts to a verdict', () => {
         for (const { step, script } of stepScripts()) {
             const { verdict, message } = run(script)
             expect({ step, verdict: typeof verdict }).toEqual({ step, verdict: 'boolean' })
-            if (verdict === false) expect(message, step).toMatch(/expected HTTP/)
+            if (verdict === false) expect(message, step).toMatch(/expected HTTP|expected the lock/)
             expect(message, step).not.toMatch(/TypeError|ReferenceError|is not a function|is not defined|undefined/)
         }
     })

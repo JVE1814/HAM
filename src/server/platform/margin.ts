@@ -91,6 +91,8 @@ function costServiceIntervals(period: GlideRecord, queued: JobEvent): void {
             const asset = interval.asset
             // Its costs are not known, so it fails (counted on the period) rather than being costed at nothing.
             if (!asset) throw new Error(`its Asset ${interval.assetId || '(none)'} is not found, so its costs are not known`)
+            // CostLedger.add drops a cost without a Customer, so the interval fails (counted) rather than being left out without a word.
+            if (!interval.customerId) throw new Error('it names no Customer to cost it to')
             // Its Subscription line's Agreement's currency: without one the interval fails (counted), as an unknown Asset does.
             const currency = currencyOrThrow(chooseCurrency(lineAgreements(interval.lineId), () => currencies(interval.customerId)))
             const costs = serviceIntervalCosts(interval, { ...asset, lease: (asset.leaseId ? leases(asset.leaseId) : null) }, bounds, amortisationMonths)
@@ -224,6 +226,12 @@ function addFieldLabour(periodId: string, bounds: MonthBounds): Failures {
     workOrder.query()
     while (workOrder.next()) {
         const customerId = str(workOrder, 'company')
+        // Counted, as a shipment's is (addShippingCosts): CostLedger.add would drop its cost without a word.
+        if (!customerId) {
+            result.failed++
+            result.lastError = `work order ${str(workOrder, 'number')}: it has no Customer to cost it to`
+            continue
+        }
         const currency = chooseCurrency(workOrderAgreement(workOrder), () => currencies(customerId))
         if ('problem' in currency) {
             result.failed++

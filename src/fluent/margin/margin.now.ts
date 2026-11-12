@@ -19,7 +19,7 @@ import { BILLING_PERIOD_STATUS, COST_TYPE_CHOICES } from '../../server/domain/vo
 import { EVENT } from '../../server/domain/events'
 import { computeMargin, uiRecomputeMargin } from '../../server/entry/margin'
 import { PROPERTY } from '../../server/domain/properties'
-import { admin, finance } from '../shared/roles.now'
+import { admin, assetManager, finance, providerStaff } from '../shared/roles.now'
 
 export const x_daas_ham_cost_fact = Table({
     name: 'x_daas_ham_cost_fact',
@@ -178,6 +178,32 @@ Acl({
     table: 'x_daas_ham_margin',
     operation: 'delete',
     roles: [admin],
+})
+
+/*
+ * A work order's NaaS labour cost is the Provider's figure and feeds the Cost facts above. wm_order is the platform's
+ * table, whose own ACLs decide who reads and saves a work order, and a field with no ACL of its own is read and
+ * changed with its record: by every field tech, and by the Provider IT's field staff. The Margin pass reads it through
+ * GlideRecord, which no ACL checks.
+ */
+Acl({
+    $id: Now.ID['acl_wm_order_labour_cost_read'],
+    type: 'record',
+    table: 'wm_order',
+    field: 'x_daas_ham_labour_cost',
+    operation: 'read',
+    roles: providerStaff,
+    description: "NaaS: a work order's field labour cost is the Provider's, read by provider staff only.",
+})
+
+Acl({
+    $id: Now.ID['acl_wm_order_labour_cost_write'],
+    type: 'record',
+    table: 'wm_order',
+    field: 'x_daas_ham_labour_cost',
+    operation: 'write',
+    roles: [assetManager, finance],
+    description: "NaaS: a work order's field labour cost is changed by hand only by an asset manager or finance.",
 })
 
 Form({

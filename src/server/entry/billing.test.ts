@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { generateBillingLines, guardBillingPeriodMonth, uiCloseBillingPeriod, uiRegenerateBillingPeriod } from './billing.ts'
 import { generateNewPeriod } from '../platform/billing.ts'
+import { waiveOpenFees } from '../platform/fees.ts'
 import { EVENT } from '../domain/events.ts'
 import { platform, recordOf, type Row } from '../test-support/fake-glide.ts'
 import type { GlideRecord } from '@servicenow/glide'
@@ -159,6 +160,27 @@ describe('Close period', () => {
         expect(fee('fee2')).toMatchObject({ status: 'waived', billing_period: '' })
         expect(fee('fee3')).toMatchObject({ status: 'open' })
         expect(linesOf('2026-09').map((line) => line.fee_event).filter(Boolean)).toEqual(['fee1'])
+    })
+})
+
+describe('a fee waived while its period is being closed', () => {
+    it('stays open for the Close to mark billed, as its line is on the closed bill, and is logged to credit', () => {
+        Object.assign(fee('fee1') ?? {}, { return_order: 'ret1' })
+        generate('2026-09')
+        let scanned = false
+        platform.onSave = (table, row) => {
+            if (table !== PERIOD || row.status !== 'closed' || scanned) return
+            scanned = true
+            // The missing unit is scanned in at the depot while the Close saves the period, after it took the waived fees off.
+            waiveOpenFees({ type: 'lost', assetId: 'a1', returnOrderId: 'ret1' })
+        }
+
+        expect(close(period('2026-09'))).toEqual(closed('2026-09'))
+
+        expect(scanned).toBe(true)
+        expect(fee('fee1')).toMatchObject({ status: 'billed', billing_period: periodRow('2026-09')?.sys_id })
+        expect(linesOf('2026-09').map((line) => line.fee_event).filter(Boolean)).toEqual(['fee1'])
+        expect(platform.logs).toContainEqual(expect.stringContaining("lost fee fee1 not waived: its Billing period's lock is held"))
     })
 })
 

@@ -1,19 +1,18 @@
 import { keepPreviousData, useQuery, useSuspenseQuery } from '@tanstack/react-query'
 import { createRootRouteWithContext, createRoute, notFound } from '@tanstack/react-router'
 import { CheckIcon } from 'lucide-react'
-import { useMemo, type ReactNode } from 'react'
+import { useEffect, useMemo, type ReactNode } from 'react'
 import { AppShell, type NavGroup } from '@/components/app-shell'
 import { DataGrid, type GridColumn } from '@/components/data-grid'
 import { Empty, EmptyHeader, EmptyTitle } from '@/components/ui/empty'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import type { AppContext } from '@/lib/app'
 import { sessionQuery } from '@/lib/session'
-import { fieldsQuery, listPageQuery, recordHref, type Field, type ListView, type SnRow } from '@/lib/sn'
+import { fieldsQuery, listPageQuery, pageWithin, recordHref, type Field, type SnRow } from '@/lib/sn'
 import { listById, menuFor, type ListId, type WorkspaceList } from './catalog'
 import { tabsFor } from './dashboard'
+import { parseListSearch, searchOf, viewOf, type ListSearch } from './list-search'
 import { WidgetCard } from './widget'
-
-const PAGE_SIZE = 50
 
 const listPath = (id: ListId) => `/lists/${id}`
 
@@ -68,38 +67,6 @@ function DashboardPage() {
     )
 }
 
-/** A list's view in its address: `?page=2&sort=-ends&q=cisco`, each left out at its default. */
-interface ListSearch {
-    page?: number
-    /** A field, `-` first for descending. */
-    sort?: string
-    q?: string
-}
-
-function parseListSearch(search: Record<string, unknown>): ListSearch {
-    const page = Number(search.page)
-    const sort = typeof search.sort === 'string' && /^-?[\w.]+$/.test(search.sort) ? search.sort : undefined
-    const q = typeof search.q === 'string' || typeof search.q === 'number' ? String(search.q) : ''
-    return { ...(Number.isInteger(page) && page > 1 ? { page } : {}), ...(sort ? { sort } : {}), ...(q ? { q } : {}) }
-}
-
-function viewOf({ page, sort, q }: ListSearch): ListView {
-    return {
-        page: (page ?? 1) - 1,
-        size: PAGE_SIZE,
-        sort: sort ? { id: sort.replace(/^-/, ''), desc: sort.startsWith('-') } : null,
-        search: q ?? '',
-    }
-}
-
-function searchOf(view: ListView): ListSearch {
-    return {
-        ...(view.page > 0 ? { page: view.page + 1 } : {}),
-        ...(view.sort ? { sort: `${view.sort.desc ? '-' : ''}${view.sort.id}` } : {}),
-        ...(view.search ? { q: view.search } : {}),
-    }
-}
-
 const listRoute = createRoute({
     getParentRoute: () => rootRoute,
     path: '/lists/$listId',
@@ -124,6 +91,11 @@ function RecordList({ list }: { list: WorkspaceList }) {
     const columns = useMemo(() => recordColumns(list.table, fields), [list.table, fields])
     const view = viewOf(search)
     const page = useQuery({ ...listPageQuery(list, list.order, view, fields), placeholderData: keepPreviousData })
+    // The total of the page asked for, not of the previous view's rows kept on screen meanwhile.
+    const shown = page.data && !page.isPlaceholderData ? pageWithin(view, page.data.total) : view.page
+    useEffect(() => {
+        if (shown !== view.page) void navigate({ search: (current: ListSearch) => searchOf({ ...viewOf(current), page: shown }), replace: true })
+    }, [shown, view.page, navigate])
     return (
         <>
             <h1 className="font-heading text-xl font-semibold">{list.title}</h1>
