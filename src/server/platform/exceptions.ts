@@ -99,10 +99,10 @@ export function resolveExceptions(subject: ExceptionSubject, types: readonly Exc
 
 /**
  * Resolve the open exceptions an encoded query matches, such as those on Assets the
- * reconciliation no longer checks. A blank query would resolve every exception, so it resolves nothing. One the
+ * reconciliation no longer checks. A blank query would resolve every exception, so it and null resolve nothing. One the
  * platform refuses to resolve stays open and is logged.
  */
-export function resolveExceptionsWhere(encodedQuery: string): void {
+export function resolveExceptionsWhere(encodedQuery: string | null): void {
     if (!encodedQuery) return
     const exception = new GlideRecord(TABLE)
     exception.addEncodedQuery(encodedQuery)
@@ -121,5 +121,6 @@ function resolveEach(exception: GlideRecord): void {
 
 /** The CIs (racks, network gear) with an open exception of one of `types`, each once. */
 export function cisWithOpenException(types: readonly ExceptionType[]): string[] {
-    return [...new Set(pluck(TABLE, `${OPEN_EXCEPTIONS_QUERY}^exception_typeIN${types.join(',')}^ciISNOTEMPTY`, 'ci'))]
+    const ofTypes = anyOf('exception_type', types)
+    return ofTypes ? [...new Set(pluck(TABLE, `${OPEN_EXCEPTIONS_QUERY}^${ofTypes}^ciISNOTEMPTY`, 'ci'))] : []
 }

@@ -66,20 +66,22 @@ export const OPEN_EXCEPTIONS_QUERY = `status=${EXCEPTION_STATUS.open}`
  * Encoded query on reconciliation exceptions: the open ones of `types` on an Asset outside the fleet (ADR 0016). The
  * daily reconciliation checks fleet assets only, so it would never find these cleared: raised before the Fleet flag on
  * the Provider IT's equipment in use, they are resolved. A blank flag (a row from before the column, or an Asset since
- * deleted) counts as outside.
+ * deleted) counts as outside. Null for no types.
  */
-export function outsideFleetExceptionsQuery(types: readonly ExceptionType[]): string {
-    return `${OPEN_EXCEPTIONS_QUERY}^exception_typeIN${types.join(',')}^assetISNOTEMPTY^${outsideFleetCondition('asset.')}`
+export function outsideFleetExceptionsQuery(types: readonly ExceptionType[]): string | null {
+    const ofTypes = anyOf('exception_type', types)
+    return ofTypes && `${OPEN_EXCEPTIONS_QUERY}^${ofTypes}^assetISNOTEMPTY^${outsideFleetCondition('asset.')}`
 }
 
 /**
  * Encoded query on reconciliation exceptions: the open ones of `types` on a fleet asset no longer in use (pending
  * return, back in a stockroom, disposed). The daily reconciliation compares the Assets in use only, so it would never
- * find these cleared: they are resolved.
+ * find these cleared: they are resolved. Null for no types.
  */
-export function outOfUseExceptionsQuery(types: readonly ExceptionType[]): string {
+export function outOfUseExceptionsQuery(types: readonly ExceptionType[]): string | null {
+    const ofTypes = anyOf('exception_type', types)
     const outOfUse = ALL_STAGES.filter((stage) => !IN_USE_STAGES.includes(stage))
-    return fleetStagesQuery(outOfUse, `${OPEN_EXCEPTIONS_QUERY}^exception_typeIN${types.join(',')}`, 'asset.')
+    return ofTypes && fleetStagesQuery(outOfUse, `${OPEN_EXCEPTIONS_QUERY}^${ofTypes}`, 'asset.')
 }
 
 export function reconcileAsset(asset: InstalledAssetView, now: number, unseenDays: number): ExceptionType[] {

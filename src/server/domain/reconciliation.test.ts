@@ -100,7 +100,7 @@ describe('stillSeenWithoutFleetAssetQuery', () => {
 })
 
 describe('outsideFleetExceptionsQuery', () => {
-    const query = outsideFleetExceptionsQuery(['unseen', 'serial_mismatch'])
+    const query = outsideFleetExceptionsQuery(['unseen', 'serial_mismatch']) ?? ''
     const raised = { status: 'open', exception_type: 'unseen', asset: 'a1', 'asset.x_daas_ham_fleet': 'false' }
 
     it('finds the open exceptions of the types on an Asset outside the fleet, flag false or blank', () => {
@@ -116,10 +116,14 @@ describe('outsideFleetExceptionsQuery', () => {
         expect(matches(query, { ...raised, exception_type: 'rack_overlap' })).toBe(false)
         expect(matches(query, { ...raised, asset: '', 'asset.x_daas_ham_fleet': '' })).toBe(false)
     })
+
+    it('gives no query for no types, which would match every type', () => {
+        expect(outsideFleetExceptionsQuery([])).toBeNull()
+    })
 })
 
 describe('outOfUseExceptionsQuery', () => {
-    const query = outOfUseExceptionsQuery(['unseen', 'serial_mismatch'])
+    const query = outOfUseExceptionsQuery(['unseen', 'serial_mismatch']) ?? ''
     const onAsset = (installStatus: string, substatus: string, fleet = 'true') => ({
         status: 'open',
         exception_type: 'unseen',
@@ -142,5 +146,9 @@ describe('outOfUseExceptionsQuery', () => {
         expect(matches(query, onAsset('7', 'disposed', 'false'))).toBe(false)
         expect(matches(query, { ...onAsset('7', 'disposed'), status: 'resolved' })).toBe(false)
         expect(matches(query, { ...onAsset('7', 'disposed'), exception_type: 'rack_overlap' })).toBe(false)
+    })
+
+    it('gives no query for no types, which would match every type', () => {
+        expect(outOfUseExceptionsQuery([])).toBeNull()
     })
 })
