@@ -4,7 +4,8 @@
  * Paste into Scripts - Background, scope x_daas_ham, after the demo data is loaded. It is no part of the app package.
  * It creates Customers, Sites, Agreements, site-package Subscription lines and in-service fleet assets with their
  * Service intervals, each under a name that starts with Scale or SCALE. A run stops at its cap or time budget;
- * run it again and it goes on where it stopped. A finished run creates nothing more.
+ * run it again and it goes on where it stopped. A run that had a row refused is not complete, and the next run
+ * tries that row again. A complete run creates nothing more.
  */
 (function () {
     var PARAMS =
@@ -90,17 +91,22 @@
         return assetsThisRun >= PARAMS.maxAssetsPerRun || new Date().getTime() - started >= PARAMS.budgetSeconds * 1000;
     }
 
-    function assetsOf(sitePrefix) {
-        var asset = new GlideRecord('alm_hardware');
-        asset.addQuery('serial_number', 'STARTSWITH', sitePrefix);
-        asset.query();
-        return asset.getRowCount();
+    function rowsWith(table, field, operator, value) {
+        var record = new GlideRecord(table);
+        record.addQuery(field, operator, value);
+        record.query();
+        return record.getRowCount();
     }
 
     /** False when the run's cap or budget was spent before the Site had all its assets. */
     function fillSite(assets, models, at, customer, agreement, site, line) {
         var sitePrefix = 'SCALE' + pad(at.customer, 4) + pad(at.site, 3);
-        if (assetsOf(sitePrefix) >= PARAMS.assetsPerSite) return true;
+        if (
+            rowsWith('alm_hardware', 'serial_number', 'STARTSWITH', sitePrefix) >= PARAMS.assetsPerSite &&
+            rowsWith('x_daas_ham_service_interval', 'site', '=', site) >= PARAMS.assetsPerSite
+        ) {
+            return true;
+        }
         var now = new GlideDateTime().getValue();
         for (var unit = 1; unit <= PARAMS.assetsPerSite; unit++) {
             var serial = sitePrefix + pad(unit, 4);
@@ -180,7 +186,11 @@
             }
         }
         var seconds = Math.round((new Date().getTime() - started) / 1000);
-        var end = complete ? 'complete' : 'stopped at its cap or time budget: run it again to go on';
+        var end = !complete
+            ? 'stopped at its cap or time budget: run it again to go on'
+            : refused
+              ? 'not complete: run it again to retry what was refused'
+              : 'complete';
         say('created ' + JSON.stringify(created) + ', ' + refused + ' refused, in ' + seconds + ' s; ' + end);
     }
 

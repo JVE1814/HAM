@@ -14,7 +14,7 @@ const CLEANUP = read('./cleanup-fleet.js')
 const REFERENCES = { asset: 'alm_hardware', customer: 'customer_account' }
 const INSTANCE = 'dev-dry-run'
 
-function instance({ provider = 'Demo NaaS Provider' } = {}) {
+function instance({ provider = 'Demo NaaS Provider', refuse = () => false } = {}) {
     const tables = {
         core_company: [{ sys_id: 'provider', name: provider }],
         cmdb_hardware_product_model: ['C9300-48P-E', 'MR46-HW', 'FG-60F'].map((pid) => ({ sys_id: `model-${pid}`, x_daas_ham_oem_pid: pid })),
@@ -79,6 +79,7 @@ function instance({ provider = 'Demo NaaS Provider' } = {}) {
             return this.row.sys_id ?? ''
         }
         insert() {
+            if (refuse(this.table)) return ''
             this.row = { ...this.row, sys_id: `id${++ids}` }
             rowsOf(this.table).push(this.row)
             return this.row.sys_id
@@ -179,5 +180,16 @@ const NOTHING = Object.fromEntries(Object.keys(GENERATED).map((table) => [table,
     assert.equal(runs + 1, 5, 'a capped run of 7 assets completes 30 in 5 runs')
     assert.deepEqual(counts(dev), GENERATED, 'the capped runs create every row once')
 }
+{
+    let refusals = 1
+    const dev = instance({ refuse: (table) => table === 'x_daas_ham_service_interval' && refusals-- > 0 })
+    const full = { ...SHAPE, confirm: INSTANCE }
+    const first = dev.run(GENERATE, full)
+    assert.match(first, /1 refused/)
+    assert.doesNotMatch(first, /complete$/, 'a run with a refused row is not complete')
+    assert.equal(dev.count('x_daas_ham_service_interval'), 29, 'the refused interval is missing')
+    assert.match(dev.run(GENERATE, full), /created \{"x_daas_ham_service_interval":1\}, 0 refused, in \d+ s; complete$/)
+    assert.deepEqual(counts(dev), GENERATED, 'a rerun creates the refused interval')
+}
 
-console.log('dry run ok: 2 customers, 2 agreements, 6 sites, 6 lines, 30 assets, 30 intervals; rerun 0; capped 5 runs; cleanup 4 runs')
+console.log('dry run ok: 2 customers, 2 agreements, 6 sites, 6 lines, 30 assets, 30 intervals; rerun 0; capped 5 runs; refused interval retried; cleanup 4 runs')
