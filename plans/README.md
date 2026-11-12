@@ -151,7 +151,7 @@ checked by reading only. Each executor still runs its own gate.
 | [037](037-tracking-webhook-bounds.md) | Refuse a short webhook token, and take at most 100 tracking events from one update | P3 | S | 030 (landing order) | DONE (instance check pending) |
 | [038](038-scheduled-returns-rotation.md) | Read scheduled returns on from where the last run stopped | P3 | S | none | DONE |
 | [039](039-manual-in-service-spike.md) | Draft the design of a manual in-service confirmation, with its open decisions | P3 | M (coarse) | none; reads 035 if present | DONE (9 open decisions await the owner) |
-| [040](040-p2-10-dashboard-tiles-spike.md) | Draft the missing P2.10 dashboard tiles: refresh, overdue returns and replacement SLA | P3 | S | none | TODO |
+| [040](040-p2-10-dashboard-tiles-spike.md) | Draft the missing P2.10 dashboard tiles: refresh, overdue returns and replacement SLA | P3 | S | none | DONE (7 open decisions await the owner) |
 | [041](041-billing-export-and-last-page.md) | Log a CSV export the platform does not attach, and name no next page after a full last page | P2 | S | 023 | DONE (instance check pending) |
 | [042](042-interval-closed-before-it-starts.md) | Remove a Service interval that has not started when its Asset leaves service | P2 | S | 024 | DONE (instance check pending) |
 | [043](043-billing-integrity-line-tiles.md) | Count on the Billing integrity tab the units on a pending line and the ended lines still billed | P2 | S | 025; after 024 | DONE (instance check pending) |
