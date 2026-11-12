@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { fieldsOf, type Stage } from '../domain/lifecycle.ts'
 import { LOCK } from '../domain/lock-names.ts'
 import { FEE_STATUS, RETURN_LINE_STATUS } from '../domain/vocabulary.ts'
+import { withLock } from './locks.ts'
 import { chaseOverdue, raiseReturn, requestReturn } from './returns.ts'
 import { platform, type Row } from '../test-support/fake-glide.ts'
 
@@ -128,5 +129,36 @@ describe("a Customer admin's site decommission", () => {
         ]
         expect(decommission()).toEqual({ raised: true, number: 'RET0002', lines: 1 })
         expect(returning()).toEqual(['a1'])
+    })
+})
+
+describe('the daily chase of overdue returns', () => {
+    beforeEach(() => {
+        platform.references = { [`${RETURN_LINES}.return_order`]: RETURNS, [`${RETURNS}.agreement`]: 'x_daas_ham_agreement' }
+        platform.clock = Date.parse('2026-11-11T05:20:00Z')
+        platform.tables.alm_hardware = [unit('pending_return')]
+        // Due back ten days ago: overdue, and within the 14 days of grace before the unit is declared missing.
+        platform.tables[RETURNS] = [{ sys_id: 'retA', number: 'RET0001', customer: 'acme', due_back: '2026-11-01', escalated: 'false' }]
+        platform.tables[RETURN_LINES] = [{ sys_id: 'lineA', return_order: 'retA', asset: 'a1', status: 'awaiting' }]
+    })
+
+    const notices = () => platform.events.filter((event) => event.name === 'x_daas_ham.return.overdue')
+
+    it('escalates an overdue Return order once, and lets its run lock go', () => {
+        chaseOverdue()
+        chaseOverdue()
+
+        expect(rows(RETURNS)[0]?.escalated).toBe('true')
+        expect(notices()).toHaveLength(1)
+        expect(rows(LOCKS)).toEqual([])
+    })
+
+    it('chases nothing while another run holds its lock, and says so', () => {
+        const other = withLock(LOCK.overdueReturnsRun(), () => chaseOverdue())
+
+        expect(other.ran).toBe(true)
+        expect(rows(RETURNS)[0]?.escalated).toBe('false')
+        expect(notices()).toEqual([])
+        expect(platform.logs).toContainEqual(expect.stringContaining(LOCK.overdueReturnsRun()))
     })
 })

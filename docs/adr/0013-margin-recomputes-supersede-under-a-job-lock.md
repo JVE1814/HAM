@@ -154,6 +154,24 @@ now* at once never load the same stalest Assets and both insert a serial's new c
 not updated afterwards would keep a stale coverage end. It holds no other lock when it takes it,
 does not retry, and checks nothing when it finds it held. Under it, it saves coverage records and
 Assets, and every lock their rules take comes later in the order. A run that has lost it starts no further batch.
+The daily lease review holds `lease_review_run` for the whole run, so a run and an *Execute now* at
+once never both find a lease with no open decision and raise one each: the second would stay open
+once the first is applied, could be applied again, and would keep the review from raising the next.
+It holds no other lock when it takes it, does not retry, and reviews nothing when it finds it held.
+Under it, it saves Lease schedules and inserts decisions, whose rules take no lock. A run that has
+lost it raises no further decision.
+The daily attestation run holds `attestation_run` for the whole run, so a run and an *Execute now*
+at once never both find a Site with no open attestation and open one each. It holds no other lock
+when it takes it, does not retry, and opens nothing when it finds it held. Under it, it inserts
+attestations and their items, whose rules take no lock. A run that has lost it opens no further
+attestation.
+The daily chase of overdue returns holds `overdue_returns_run` for the whole run, so a run and an
+*Execute now* at once never both read a Return order as not escalated and notify its Customer
+twice, nor both advance the job's one cursor. It holds no other lock when it takes it, does not
+retry, and chases nothing when it finds it held. Under it, it declares each unit missing under that
+unit's `receive_asset_` lock, with what that takes under it, so it comes before `receive_asset`. A
+run ends on the job time budget (`x_daas_ham.job.budget_seconds`), well short of
+`ABANDONED_AFTER_MINUTES`, so it does not check for a lost lock.
 A unit is put on a Return order under `return_asset_<Asset sys_id>`: the check that it awaits no other
 return and the insert of its line are one critical section, so two Returns raised at once (a request
 sent twice, the record producer beside the customer page or an Agreement's end) never both take it.

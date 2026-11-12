@@ -20,7 +20,7 @@ untracked `.audit/` folder, which plan 001 fixes. Every other plan depends on 00
 | [005](005-decommission-visible-query.md) | Keep a requested site decommission to the units its requester may see | P1 | S | 001 | DONE |
 | [006](006-labour-cost-field-acl.md) | Keep a work order's labour cost to provider staff, and its edits to asset managers and finance | P2 | S | 001 | DONE |
 | [007](007-dashboard-widget-audience.md) | Offer a dashboard widget only to the roles that read its table | P2 | S | 001 | DONE |
-| [008](008-job-run-locks.md) | Hold a run lock in the lease review, attestation and overdue-return jobs | P2 | S | 001 | TODO |
+| [008](008-job-run-locks.md) | Hold a run lock in the lease review, attestation and overdue-return jobs | P2 | S | 001 | DONE |
 | [009](009-fee-lock-waive-close.md) | Waive a fee under its lock and its Billing period's lock | P2 | M | 001, 008 | TODO |
 | [010](010-customer-route-array-caps.md) | Refuse a customer page request that lists more than 5000 devices | P2 | S | 001 | TODO |
 | [011](011-in-service-characterization.md) | Test in-service detection and the subscription start on the fake Glide | P2 | M | 001 | TODO |

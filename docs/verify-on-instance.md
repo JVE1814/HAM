@@ -662,6 +662,17 @@ refresh orders* run holds the job lock `refresh_orders`. With a row of that name
 Orders not raised: another run holds the refresh_orders lock and raises them* (info). Delete the
 row and the next run raises them.
 
+### Lease review, attestation and overdue-return run locks
+
+[How a job lock behaves](#how-a-job-lock-behaves). The daily *NaaS - review leases*, *NaaS - raise
+attestations* and *NaaS - chase overdue returns* runs each hold a job lock for the whole run:
+`lease_review_run`, `attestation_run` and `overdue_returns_run`. With a row of that name in *Job
+lock*, *Execute now* on its job does nothing. It logs two *Unique Key violation* errors and
+*[x_daas_ham] Leases not reviewed: another run holds the lease_review_run lock and reviews them*,
+*Attestations not raised: another run holds the attestation_run lock and raises them* or *Overdue
+returns not chased: another run holds the overdue_returns_run lock and chases them* (info). Delete
+the row and the next run does the work.
+
 ### Spare-pool lock
 
 Daily spare-pool top-up ([how a job lock behaves](#how-a-job-lock-behaves)). The *NaaS - spare pool

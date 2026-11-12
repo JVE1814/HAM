@@ -450,8 +450,20 @@ export function evaluateReturnLine(line: GlideRecord): Evaluation {
     return { evaluated: true }
 }
 
-/** Escalate overdue returns once, then declare the Assets missing and charge the lost-asset fee (the daily job). */
+/**
+ * Escalate overdue returns once, then declare the Assets missing and charge the lost-asset fee (the daily job). Two
+ * runs at once (the scheduled job and an *Execute now*) would both read a Return order as not escalated and each notify
+ * its Customer, and both advance the job's one cursor, so a run holds a job lock (ADR 0013) throughout; one that finds
+ * it held chases nothing and logs so. Taking the lock throws only when an insert is refused with no lock row
+ * (platform/locks): that error escapes.
+ */
 export function chaseOverdue(): void {
+    const lockName = LOCK.overdueReturnsRun()
+    if (withLock(lockName, chaseHolding).ran) return
+    log.info(`Overdue returns not chased: another run holds the ${lockName} lock and chases them`)
+}
+
+function chaseHolding(): void {
     const today = todayIso()
     const grace = intProperty(PROPERTY.returnGraceDays)
     runTableJob({

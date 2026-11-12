@@ -27,6 +27,12 @@ export const LOCK = {
     oemClaimRun: () => named('oem_claim_run'),
     /** Held by an OEM coverage run throughout, so two runs never insert the same serial's contract twice. */
     oemCoverageRun: () => named('oem_coverage_run'),
+    /** Held by a lease review throughout, so two runs never raise two decisions for one lease. */
+    leaseReviewRun: () => named('lease_review_run'),
+    /** Held by an attestation run throughout, so two runs never open two attestations for one Site. */
+    attestationRun: () => named('attestation_run'),
+    /** Held by an overdue-returns run throughout, so two runs never escalate one Return order twice. */
+    overdueReturnsRun: () => named('overdue_returns_run'),
     /** An Asset's sightings (the device-events REST handler, the in-service detection job) take turns under it. */
     seenAsset: (assetId: string) => named(`seen_asset_${assetId}`),
     /**
