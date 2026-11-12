@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it } from 'vitest'
 import { glide, platform, recordOf } from './fake-glide'
 
-const { GlideRecord, GlideAggregate, GlideDateTime, gs } = glide
+const { GlideRecord, GlideAggregate, GlideDateTime, GlideSysAttachment, gs } = glide
 
 const LINES = 'x_daas_ham_order_line'
 const ORDERS = 'x_daas_ham_order'
@@ -54,6 +54,27 @@ describe('reading', () => {
         expect(idsOf(line)).toEqual(['l1', 'l4', 'l3', 'l2'])
         line.setLimit(2)
         expect(idsOf(line)).toEqual(['l1', 'l4'])
+    })
+
+    it('gives the rows of a window of the ordered result, the later of chooseWindow and setLimit deciding which', () => {
+        const line = new GlideRecord(LINES)
+        line.orderBy('sys_id')
+        line.chooseWindow(1, 3, false)
+        expect(idsOf(line)).toEqual(['l2', 'l3'])
+        line.chooseWindow(3, 9, false)
+        expect(idsOf(line)).toEqual(['l4'])
+        line.chooseWindow(4, 6, false)
+        expect(idsOf(line)).toEqual([])
+        line.setLimit(1)
+        expect(idsOf(line)).toEqual(['l1'])
+        line.chooseWindow(2, 4, false)
+        expect(idsOf(line)).toEqual(['l3', 'l4'])
+    })
+
+    it('orders by the ORDERBY terms of an encoded query, as by orderBy and orderByDesc', () => {
+        const line = new GlideRecord(LINES)
+        line.addEncodedQuery('orderISNOTEMPTY^ORDERBYDESCline_stage^ORDERBYquantity')
+        expect(idsOf(line)).toEqual(['l1', 'l3', 'l2'])
     })
 
     it('fails the test on an operator, a reference or a ^NQ combination it does not know', () => {
@@ -224,6 +245,23 @@ describe('the rest of the instance', () => {
         expect(current.isNewRecord()).toBe(false)
         expect(recordOf<InstanceType<typeof GlideRecord>>(LINES, {}, { fresh: true }).isNewRecord()).toBe(true)
         expect(platform.tables[LINES]).toHaveLength(4)
+    })
+
+    it('attaches a file to a record as a sys_attachment row, keeps its content and deletes it by sys_id', () => {
+        const attachments = new GlideSysAttachment()
+        const id = attachments.write(find(ORDERS, 'o1'), 'order.csv', 'text/csv', 'a,b\r\n') ?? ''
+        expect(platform.tables.sys_attachment).toEqual([
+            expect.objectContaining({ sys_id: id, table_name: ORDERS, table_sys_id: 'o1', file_name: 'order.csv', content_type: 'text/csv' }),
+        ])
+        expect(platform.attachments).toEqual({ [id]: 'a,b\r\n' })
+
+        platform.refuses = (table) => (table === 'sys_attachment' ? 'no attachment' : '')
+        expect(attachments.write(find(ORDERS, 'o2'), 'order.csv', 'text/csv', '')).toBeNull()
+        platform.refuses = () => ''
+
+        attachments.deleteAttachment(id)
+        expect(platform.tables.sys_attachment).toEqual([])
+        expect(platform.attachments).toEqual({})
     })
 
     it('queues events, logs and reads the clock, the user and the properties the test set', () => {

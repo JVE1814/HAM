@@ -77,6 +77,8 @@ function state() {
         /** What the user was told (gs.addErrorMessage, gs.addInfoMessage), as `<error|info> <message>`. */
         messages: [] as string[],
         properties: {} as Record<string, string>,
+        /** The content of each attachment written (GlideSysAttachment#write), by the sys_id of its sys_attachment row. */
+        attachments: {} as Record<string, string>,
         /** The time now, in epoch ms. */
         clock: CLOCK_START,
         user: { id: '', name: '', company: '', roles: [] as string[], interactive: true },
@@ -210,7 +212,8 @@ class Conditions {
 
 class GlideRecord extends Conditions {
     private ordering: Array<{ field: string; descending: boolean }> = []
-    private limit = Infinity
+    /** The rows of the ordered result a query gives: from `first` up to, not including, `last`. */
+    private window = { first: 0, last: Infinity }
     private found: Row[] = []
     private at = -1
     private row: Row = {}
@@ -232,8 +235,23 @@ class GlideRecord extends Conditions {
     orderByDesc(field: string): void {
         this.ordering.push({ field, descending: true })
     }
+    /** The platform's setLimit is chooseWindow(0, limit): whichever of the two is called last decides the rows. */
     setLimit(limit: number): void {
-        this.limit = limit
+        this.window = { first: 0, last: limit }
+    }
+    /** Rows `first` up to, not including, `last` of the ordered result; forceCount changes no row. */
+    chooseWindow(first: number, last: number, _forceCount?: boolean): void {
+        this.window = { first, last }
+    }
+    /** An encoded query's `ORDERBY<field>` and `ORDERBYDESC<field>` terms order the rows, as orderBy and orderByDesc do. */
+    override addEncodedQuery(query: string): void {
+        const conditions: string[] = []
+        for (const term of query.split('^')) {
+            const order = /^ORDERBY(DESC)?(.+)$/.exec(term)
+            if (order) this.ordering.push({ field: order[2] ?? '', descending: order[1] !== undefined })
+            else conditions.push(term)
+        }
+        super.addEncodedQuery(conditions.join('^'))
     }
     setWorkflow(): void {}
 
@@ -242,7 +260,7 @@ class GlideRecord extends Conditions {
         for (const { field, descending } of [...this.ordering].reverse()) {
             found.sort((a, b) => compare(walk(this.table, a, field), walk(this.table, b, field)) * (descending ? -1 : 1))
         }
-        this.found = found.slice(0, this.limit)
+        this.found = found.slice(this.window.first, this.window.last)
         this.at = -1
     }
     hasNext(): boolean {
@@ -405,6 +423,25 @@ class GlideAggregate extends Conditions {
     }
 }
 
+/** Attachments are rows of sys_attachment, saved like any other; their content is kept in `platform.attachments`. */
+class GlideSysAttachment {
+    write(record: GlideRecord, fileName: string, contentType: string, content: string): string | null {
+        const attachment = new GlideRecord('sys_attachment')
+        attachment.initialize()
+        attachment.setValue('table_name', record.getTableName())
+        attachment.setValue('table_sys_id', record.getUniqueValue())
+        attachment.setValue('file_name', fileName)
+        attachment.setValue('content_type', contentType)
+        const id = attachment.insert()
+        if (id) platform.attachments[id] = content
+        return id
+    }
+    deleteAttachment(attachmentId: string): void {
+        const attachment = new GlideRecord('sys_attachment')
+        if (attachment.get(attachmentId) && attachment.deleteRecord()) delete platform.attachments[attachmentId]
+    }
+}
+
 class GlideDateTime {
     private ms: number
     constructor(value?: string) {
@@ -452,7 +489,7 @@ const gs = {
     isInteractive: () => platform.user.interactive,
 }
 
-export const glide = { GlideRecord, GlideAggregate, GlideDateTime, GlideTableHierarchy, gs }
+export const glide = { GlideRecord, GlideAggregate, GlideDateTime, GlideSysAttachment, GlideTableHierarchy, gs }
 
 /**
  * A record of `table` holding `row`, as a rule, an ACL or a script action is handed one: read from the table, or with

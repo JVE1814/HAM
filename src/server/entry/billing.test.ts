@@ -1,10 +1,23 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { generateBillingLines, guardBillingPeriodMonth, uiCloseBillingPeriod, uiRegenerateBillingPeriod } from './billing.ts'
-import { generateNewPeriod } from '../platform/billing.ts'
+import {
+    exportBillingPeriod,
+    generateBillingLines,
+    getBillingLines,
+    guardBillingPeriodMonth,
+    listBillingPeriods,
+    uiCloseBillingPeriod,
+    uiExportBillingPeriod,
+    uiRegenerateBillingPeriod,
+    uiResetBillingGeneration,
+} from './billing.ts'
+import { generateNewPeriod, type BillingLinesPage } from '../platform/billing.ts'
 import { waiveOpenFees } from '../platform/fees.ts'
+import { PULL_PAGE } from '../domain/billing.ts'
 import { EVENT } from '../domain/events.ts'
+import { ROLE } from '../domain/roles.ts'
 import { platform, recordOf, type Row } from '../test-support/fake-glide.ts'
 import type { GlideRecord } from '@servicenow/glide'
+import type { RESTAPIRequest, RESTAPIResponse } from '@servicenow/glide/sn_ws_int'
 
 vi.mock('@servicenow/glide', async () => (await import('../test-support/fake-glide.ts')).glide)
 
@@ -12,6 +25,8 @@ const PERIOD = 'x_daas_ham_billing_period'
 const LINE = 'x_daas_ham_billing_line'
 const FEE = 'x_daas_ham_fee_event'
 const SUBSCRIPTION = 'x_daas_ham_subscription_line'
+const CURSOR = 'x_daas_ham_job_cursor'
+const ATTACHMENT = 'sys_attachment'
 
 const rows = (table: string): Row[] => platform.tables[table] ?? []
 const periodRow = (month: string): Row | undefined => rows(PERIOD).find((row) => row.period === month)
@@ -47,13 +62,43 @@ const regenerate = (current: GlideRecord) => told(uiRegenerateBillingPeriod, cur
 const closed = (month: string) => [`info ${month} closed and locked; the CSV export and margin are being prepared`]
 const regenerating = (month: string) => [`info Regenerating ${month}`]
 
-/** Create the period of `month` as finance does by hand, and run its generation. */
-function generate(month: string): void {
+/** Create the period of `month` as finance does by hand: its first generation chunk is queued, not run. */
+function create(month: string): void {
     const created = recordOf<GlideRecord>(PERIOD, { period: month, status: 'generating' }, { fresh: true })
     guardBillingPeriodMonth(created)
     created.insert()
     generateNewPeriod(created)
+}
+
+/** Create the period of `month` as finance does by hand, and run its generation. */
+function generate(month: string): void {
+    create(month)
     drainGeneration()
+}
+
+/** Run each CSV export queued, as its script action does; every other event is dropped. */
+function drainExport(): void {
+    for (let event = platform.events.shift(); event; event = platform.events.shift()) {
+        if (event.name === EVENT.billingExport) exportBillingPeriod(recordOf('sysevent', { name: event.name, parm1: event.parm1 }))
+    }
+}
+
+/** Call a route of the pull API as the platform does, each query parameter an array, for a user holding `roles`. */
+function pull(
+    route: (request: RESTAPIRequest, response: RESTAPIResponse) => void,
+    sent: { id?: string; query?: Record<string, string> } = {},
+    roles: string[] = [ROLE.integration],
+): { status: number; body: unknown } {
+    platform.user = { ...platform.user, roles }
+    const reply = { status: 0, body: null as unknown }
+    const queryParams = Object.fromEntries(Object.entries(sent.query ?? {}).map(([name, value]) => [name, [value]]))
+    const request = { pathParams: { id: sent.id }, queryParams } as unknown as RESTAPIRequest
+    const response = {
+        setStatus: (status: number) => void (reply.status = status),
+        setBody: (body: unknown) => void (reply.body = body),
+    } as unknown as RESTAPIResponse
+    route(request, response)
+    return reply
 }
 
 /** Save the period with its month changed, as the form does: the month rule runs first. */
@@ -254,5 +299,250 @@ describe('a fee whose date is moved past its period during review', () => {
             ['subscription', '300'],
             ['fee', '50'],
         ])
+    })
+})
+
+describe('the billing pull API', () => {
+    const line = (sysId: string, customer: string, amount: string, currency = 'EUR'): Row => ({
+        sys_id: sysId,
+        billing_period: 'p9',
+        kind: 'subscription',
+        customer,
+        agreement: 'ag1',
+        subscription_line: 'sub1',
+        site: 'site1',
+        description: 'Site package',
+        units: '30',
+        monthly_rate: '300',
+        amount,
+        currency,
+    })
+    const page = (query: Record<string, string>) => pull(getBillingLines, { id: 'p9', query }).body as BillingLinesPage
+    const ids = (lines: BillingLinesPage['lines']) => lines.map((sent) => sent.id)
+
+    beforeEach(() => {
+        platform.tables[PERIOD] = [
+            { sys_id: 'p8', period: '2026-08', status: 'closed', line_count: '0' },
+            { sys_id: 'p9', period: '2026-09', status: 'closed', line_count: '5' },
+        ]
+        // Stored in no order: a page is cut from the lines by customer, then by sys_id.
+        platform.tables[LINE] = [
+            line('l2', 'initech', '10', 'USD'),
+            line('l4', 'globex', '40'),
+            line('l3', 'acme', '100'),
+            line('l1', 'globex', '30'),
+            line('l5', 'acme', '200'),
+        ]
+    })
+
+    it('lists the most recent periods, newest first, each with its totals per currency', () => {
+        expect(pull(listBillingPeriods)).toEqual({
+            status: 200,
+            body: {
+                periods: [
+                    {
+                        id: 'p9',
+                        period: '2026-09',
+                        status: 'closed',
+                        lines: 5,
+                        totals: [
+                            { currency: 'EUR', lines: 4, amount: 370 },
+                            { currency: 'USD', lines: 1, amount: 10 },
+                        ],
+                    },
+                    { id: 'p8', period: '2026-08', status: 'closed', lines: 0, totals: [] },
+                ],
+            },
+        })
+        expect((pull(listBillingPeriods, { query: { limit: '1' } }).body as { periods: Array<{ id: string }> }).periods.map((period) => period.id)).toEqual(['p9'])
+    })
+
+    it("pages a period's lines by customer: two full pages, then the rest and no next page", () => {
+        const first = page({ limit: '2' })
+        expect(first).toMatchObject({ period: '2026-09', status: 'closed', final: true, offset: 0, nextOffset: 2 })
+        expect(first.totals).toEqual([
+            { currency: 'EUR', lines: 4, amount: 370 },
+            { currency: 'USD', lines: 1, amount: 10 },
+        ])
+        expect(ids(first.lines)).toEqual(['l3', 'l5'])
+        expect(first.lines[0]).toEqual({
+            id: 'l3',
+            kind: 'subscription',
+            customerId: 'acme',
+            customer: 'acme',
+            agreement: 'ag1',
+            subscriptionLine: 'sub1',
+            siteId: 'site1',
+            site: 'site1',
+            feeEvent: '',
+            description: 'Site package',
+            units: 30,
+            monthlyRate: 300,
+            amount: 100,
+            currency: 'EUR',
+        })
+
+        const second = page({ limit: '2', offset: '2' })
+        expect([ids(second.lines), second.offset, second.nextOffset]).toEqual([['l1', 'l4'], 2, 4])
+
+        const last = page({ limit: '2', offset: '4' })
+        expect([ids(last.lines), last.offset, last.nextOffset]).toEqual([['l2'], 4, null])
+    })
+
+    it('follows a last page that is full with an empty one, which names no next page', () => {
+        rows(LINE).pop()
+        expect(page({ limit: '2', offset: '2' }).nextOffset).toBe(4)
+        expect(page({ limit: '2', offset: '4' })).toMatchObject({ lines: [], nextOffset: null })
+    })
+
+    it("gives every line by default, one for a limit of 0 and no more than the page's most", () => {
+        expect(ids(page({}).lines)).toEqual(['l3', 'l5', 'l1', 'l4', 'l2'])
+        expect(ids(page({ limit: '0' }).lines)).toEqual(['l3'])
+
+        const most = PULL_PAGE.lines.most
+        platform.tables[LINE] = Array.from({ length: most + 1 }, (_, at) => line(`l${String(at).padStart(5, '0')}`, 'acme', '1'))
+        const capped = page({ limit: String(most * 2) })
+        expect([capped.lines.length, capped.nextOffset]).toEqual([most, most])
+    })
+
+    it('says a period still open is not final', () => {
+        Object.assign(periodRow('2026-09') ?? {}, { status: 'ready' })
+        expect(page({})).toMatchObject({ status: 'ready', final: false })
+    })
+
+    it('answers 404 for a period it does not know, and 403 without the finance or integration role', () => {
+        expect(pull(getBillingLines, { id: 'nosuch' })).toEqual({ status: 404, body: { error: 'Unknown billing period' } })
+        const refused = { status: 403, body: { error: 'Requires the finance or integration role' } }
+        expect(pull(getBillingLines, { id: 'p9' }, [ROLE.assetManager])).toEqual(refused)
+        expect(pull(listBillingPeriods, {}, [])).toEqual(refused)
+        expect(pull(listBillingPeriods, {}, [ROLE.finance]).status).toBe(200)
+    })
+})
+
+describe('Reset generation', () => {
+    const MINUTE = 60000
+    const reset = (current: GlideRecord) => told(uiResetBillingGeneration, current)
+    const cursor = (): Row | undefined => rows(CURSOR)[0]
+
+    beforeEach(() => {
+        platform.user = { ...platform.user, name: 'Ada Admin', roles: [ROLE.admin] }
+    })
+
+    it('is refused while the generation showed activity in the last 30 minutes, which then finishes', () => {
+        create('2026-09')
+        platform.clock += 29 * MINUTE
+
+        expect(reset(period('2026-09'))).toEqual([
+            'error 2026-09 not reset: its generation was active 29 minute(s) ago and may still be running; it can be reset once it has shown no activity for 30 minutes',
+        ])
+        expect(periodRow('2026-09')?.status).toBe('generating')
+
+        drainGeneration()
+        expect(periodRow('2026-09')).toMatchObject({ status: 'ready', line_count: '2' })
+    })
+
+    it('holds an idle generation for review and retires its pass: Close refuses until a Regenerate, which bills each line once', () => {
+        create('2026-09')
+        platform.clock += 30 * MINUTE
+
+        expect(reset(period('2026-09'))).toEqual(['info 2026-09 is ready for review, reset by hand: Regenerate it before closing'])
+        expect(periodRow('2026-09')).toMatchObject({
+            status: 'ready',
+            line_count: '0',
+            last_error: 'Generation reset by hand by Ada Admin after 30 minutes without activity; its lines may be incomplete: Regenerate before closing',
+        })
+        expect(cursor()).toMatchObject({ cursor: '', last_status: 'reset by hand' })
+        expect(close(period('2026-09'))).toEqual([expect.stringMatching(/^error 2026-09 did not generate cleanly/)])
+
+        // The chunk the reset pass had queued is still in the queue, ahead of the Regenerate's.
+        expect(regenerate(period('2026-09'))).toEqual(regenerating('2026-09'))
+        drainGeneration()
+        expect(platform.warnings).toEqual([expect.stringContaining('dropped a generation chunk of a pass reset or replaced')])
+        expect(linesOf('2026-09').map((line) => line.amount)).toEqual(['300', '50'])
+        expect(close(period('2026-09'))).toEqual(closed('2026-09'))
+    })
+
+    it('leaves the period generating when a chunk of its pass starts as the pass is retired', () => {
+        create('2026-09')
+        platform.clock += 30 * MINUTE
+        platform.onSave = (table, row) => {
+            // A chunk records its activity on the job cursor while the Reset saves the cursor without its pass.
+            if (table === CURSOR && row.cursor === '') Object.assign(cursor() ?? {}, { last_run: '2026-11-11 12:30:00' })
+        }
+
+        expect(reset(period('2026-09'))).toEqual([
+            'error 2026-09 not reset: a chunk of its generation started as it was being reset. Its generation is stopped and the period stays Generating until that chunk is done: Reset generation again in 30 minutes',
+        ])
+        expect(periodRow('2026-09')?.status).toBe('generating')
+        expect(cursor()?.cursor).toBe('')
+    })
+
+    it('resets only a period still generating, and only for an admin', () => {
+        generate('2026-09')
+        platform.clock += 30 * MINUTE
+        expect(reset(period('2026-09'))).toEqual(['error 2026-09 not reset: only a period still generating can be reset'])
+
+        platform.user = { ...platform.user, roles: [ROLE.finance] }
+        expect(reset(period('2026-09'))).toEqual(['error Only an admin can reset a generation'])
+        expect(periodRow('2026-09')?.status).toBe('ready')
+    })
+})
+
+describe('the CSV export of a closed period', () => {
+    const FILE = 'billing-2026-09.csv'
+    const reexport = (current: GlideRecord) => told(uiExportBillingPeriod, current)
+    const contents = () => rows(ATTACHMENT).map((attachment) => platform.attachments[attachment.sys_id ?? ''])
+    const CSV =
+        'period,kind,customer,agreement,subscription_line,site,description,units,monthly_rate,amount,currency\r\n' +
+        '2026-09,subscription,acme,ag1,sub1,,Site package,30,300,300,EUR\r\n' +
+        '2026-09,fee,acme,ag1,,,lost fee: a1 (2026-09-20),1,0,50,EUR\r\n'
+
+    beforeEach(() => {
+        generate('2026-09')
+        expect(close(period('2026-09'))).toEqual(closed('2026-09'))
+    })
+
+    it('is attached to the period once, with a row for each of its lines', () => {
+        drainExport()
+        expect(rows(ATTACHMENT)).toEqual([
+            expect.objectContaining({ table_name: PERIOD, table_sys_id: periodRow('2026-09')?.sys_id, file_name: FILE, content_type: 'text/csv' }),
+        ])
+        expect(contents()).toEqual([CSV])
+
+        exportBillingPeriod(recordOf('sysevent', { parm1: periodRow('2026-09')?.sys_id ?? '' }))
+        expect(rows(ATTACHMENT)).toHaveLength(1)
+    })
+
+    it('keeps one copy when two exports of the period run at once', () => {
+        let raced = false
+        platform.onSave = (table) => {
+            if (table !== ATTACHMENT || raced) return
+            raced = true
+            // A second export finds no file yet while the first one writes its own.
+            exportBillingPeriod(recordOf('sysevent', { parm1: periodRow('2026-09')?.sys_id ?? '' }))
+        }
+
+        drainExport()
+
+        expect(raced).toBe(true)
+        expect(contents()).toEqual([CSV])
+    })
+
+    it('is not attached to a period that is not closed', () => {
+        Object.assign(periodRow('2026-09') ?? {}, { status: 'ready' })
+        drainExport()
+        expect(rows(ATTACHMENT)).toEqual([])
+        expect(reexport(period('2026-09'))).toEqual(['error Only a closed period can be exported'])
+    })
+
+    it('is attached again by Re-export CSV only once the file is gone', () => {
+        drainExport()
+        expect(reexport(period('2026-09'))).toEqual([`info ${FILE} is already attached; delete it to export again`])
+        expect(platform.events).toEqual([])
+
+        platform.tables[ATTACHMENT] = []
+        expect(reexport(period('2026-09'))).toEqual(['info The CSV export of 2026-09 is being prepared'])
+        drainExport()
+        expect(rows(ATTACHMENT).map((attachment) => attachment.file_name)).toEqual([FILE])
     })
 })
