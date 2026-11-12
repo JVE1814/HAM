@@ -1,9 +1,10 @@
 import { GlideRecord } from '@servicenow/glide'
+import type { LineOpenness } from '../domain/fulfilment.ts'
 import { LONG_HOLD_LOCK_TRIES, type HeldLock } from '../domain/job-lock.ts'
 import { LOCK } from '../domain/lock-names.ts'
 import type { LineStage } from '../domain/vocabulary.ts'
 import { withLockTries, type LockRun } from './locks.ts'
-import { num, refusal, str } from './records.ts'
+import { num, refusal, str, type ForeignRecord } from './records.ts'
 
 /**
  * Each write says whether the platform took it and logs nothing: the caller holds the locks it needs (ADR 0013, the
@@ -33,6 +34,15 @@ export function withOrderLineLocks<T>(lineIds: readonly string[], work: (locks: 
         return under.ran ? under.value : { ran: false }
     }
     return holdFrom(0, [])
+}
+
+/**
+ * The stages that tell whether an Order line is still open, read from `record`: the line itself, or a record that
+ * references it through the field `pathToLine`.
+ */
+export function lineOpenness(record: ForeignRecord, pathToLine = ''): LineOpenness {
+    const line = pathToLine ? `${pathToLine}.` : ''
+    return { lineStage: str(record, `${line}line_stage`), orderStage: str(record, `${line}order.stage`) }
 }
 
 export interface NewLine {

@@ -6,6 +6,7 @@ import { LINE_STAGE, type OemVendor, RMA_STATE, type RmaState } from '../domain/
 import { isFleetAsset, moveRefusal } from './assets.ts'
 import { nowGlide, todayIso } from './clock.ts'
 import { log } from './log.ts'
+import { lineOpenness } from './order-lines.ts'
 import { count, findById, refusal, str, warnRefused } from './records.ts'
 
 /** Opening the RMA with the vendor is manual (ADR 0008). */
@@ -42,13 +43,12 @@ export function openRmasFor(defectiveAssetId: string): OpenRma[] {
     rma.query()
     const open: OpenRma[] = []
     while (rma.next()) {
-        const line = { lineStage: str(rma, 'order_line.line_stage'), orderStage: str(rma, 'order_line.order.stage') }
         open.push({
             rmaId: rma.getUniqueValue(),
             rmaNumber: str(rma, 'rma_number'),
             state: str(rma, 'state') as RmaState,
             lineId: str(rma, 'order_line'),
-            lineOpen: lineStillOpen(line),
+            lineOpen: lineStillOpen(lineOpenness(rma, 'order_line')),
         })
     }
     return open

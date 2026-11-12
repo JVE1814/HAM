@@ -171,6 +171,12 @@ export function endedUnfulfilled(orderStage: string): boolean {
     return (UNFULFILLED_ORDER_STAGES as readonly string[]).includes(orderStage)
 }
 
+/** An Order line's stage and its Order's: what tells whether the line still waits to be filled. */
+export interface LineOpenness {
+    lineStage: string
+    orderStage: string
+}
+
 /** Stages in which an Order has ended, fulfilled or not. Every other Order is open (`OPEN_ORDERS_QUERY`). */
 export const ENDED_ORDER_STAGES: readonly OrderStage[] = [ORDER_STAGE.complete, ORDER_STAGE.cancelled, ORDER_STAGE.rejected]
 

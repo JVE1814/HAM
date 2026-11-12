@@ -1,7 +1,7 @@
 import { PROVIDER_STOCKROOM_TYPES } from './fleet.ts'
-import { endedUnfulfilled } from './fulfilment.ts'
+import { endedUnfulfilled, type LineOpenness } from './fulfilment.ts'
 import type { Stage } from './lifecycle.ts'
-import type { LineStage, StockroomType } from './vocabulary.ts'
+import type { StockroomType } from './vocabulary.ts'
 
 /**
  * Receiving confirms bought units as available stock: in transit (an ASN row) or on order (created on receipt without
@@ -23,10 +23,7 @@ export function receivingProblem(into: StockroomType): string | null {
 }
 
 /** An Order line as a receipt reads it again under the line's lock, to decide whether the unit still goes to it. */
-export interface ReceivingLine {
-    stage: LineStage | ''
-    /** Its Order's stage, read with the line. */
-    orderStage: string
+export interface ReceivingLine extends LineOpenness {
     quantity: number
     /** Assets on the line, in any stage. */
     allocated: number
@@ -41,7 +38,7 @@ export interface ReceivingLine {
  */
 export function allocationProblem(line: ReceivingLine): string | null {
     if (endedUnfulfilled(line.orderStage)) return `its Order is ${line.orderStage}`
-    if (line.stage !== 'awaiting_stock') return `it is no longer awaiting stock (${line.stage || 'unknown stage'})`
+    if (line.lineStage !== 'awaiting_stock') return `it is no longer awaiting stock (${line.lineStage || 'unknown stage'})`
     if (line.allocated >= line.quantity) return `it already has all ${line.quantity} unit(s)`
     return null
 }
