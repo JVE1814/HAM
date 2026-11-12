@@ -44,9 +44,10 @@ Other scheduled jobs do not use the runner. Each bounds its work its own way, or
 - Scheduled returns (`platform/scheduled-returns.ts` `raiseDueReturns`) take a limited number of ended
   Agreements and of ending temporary Orders a run (the limits are in that module); each one raised
   is flagged and drops out.
-- Attestations (`platform/attestations.ts` `raiseDueAttestations`) read every in-service or
-  temporarily deployed fleet asset of each active Agreement with an attestation interval, in one run
-  with no time budget or cursor.
+- Attestations (`platform/attestations.ts` `raiseDueAttestations`) read the Sites of each active
+  Agreement with an attestation interval with one count of its in-service or temporarily deployed
+  fleet assets grouped by Site, so no Asset row is read, then check each Site for an open
+  attestation and its last one, in one run with no time budget or cursor.
 - Lease review (`platform/leases.ts` `runLeaseReview`) reads every undecided lease that ended no
   longer ago than `REVIEWED_DAYS_PAST_END` (`domain/leases.ts`) or ends later, in one query; the
   renewal warnings read every Agreement not

@@ -39,6 +39,24 @@ describe('the daily attestation run', () => {
         expect(rows(LOCKS)).toEqual([])
     })
 
+    it('opens one attestation for a Site with several Assets, and none for an Asset at no Site', () => {
+        rows('alm_hardware').push(installed('a2', 'site1'), installed('a3', ''))
+
+        raiseDueAttestations()
+
+        expect(rows(ATTESTATIONS).map((attestation) => attestation.site)).toEqual(['site1'])
+        expect(rows(ITEMS).map((item) => item.asset)).toEqual(['a1', 'a2'])
+    })
+
+    it('opens an attestation for each Site of the Agreement, and none for a Site of an Agreement that attests nothing', () => {
+        rows('x_daas_ham_agreement').push({ sys_id: 'ag2', state: 'active', attestation_interval_months: '0', customer: 'acme' })
+        rows('alm_hardware').push(installed('a2', 'site2'), { ...installed('a3', 'site3'), x_daas_ham_agreement: 'ag2' })
+
+        raiseDueAttestations()
+
+        expect(rows(ATTESTATIONS).map((attestation) => attestation.site)).toEqual(['site1', 'site2'])
+    })
+
     it('opens nothing while another run holds its lock, and says so', () => {
         const other = withLock(LOCK.attestationRun(), () => raiseDueAttestations())
 
