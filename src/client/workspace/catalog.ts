@@ -167,7 +167,7 @@ const CATALOG = {
             table: 'alm_hardware',
             query: `${INSTALLED_CONDITION}^asset_tagISEMPTY^ORserial_numberISEMPTY^ORx_daas_ham_agreementISEMPTY^ORx_daas_ham_siteISEMPTY^${FLEET_CONDITION}`,
             columns: `${INSTALLED_ASSET_COLUMNS},x_daas_ham_agreement`,
-            audience: 'staff',
+            audience: 'broadStaff',
         },
     },
     'After-sales': {

@@ -115,7 +115,7 @@ export const DASHBOARD: readonly DashboardTab[] = [
     {
         id: 'billing',
         title: 'Billing integrity',
-        audience: 'staff',
+        audience: 'broadStaff',
         widgets: [
             {
                 id: 'unbilled_in_service',
@@ -153,7 +153,6 @@ export const DASHBOARD: readonly DashboardTab[] = [
                 title: 'Subscription lines not yet started',
                 span: 3,
                 source: { table: 'x_daas_ham_subscription_line', filter: `status=${SUBSCRIPTION_LINE_STATUS.pending}` },
-                audience: 'broadStaff',
             },
             {
                 id: 'lines_by_customer',
@@ -164,7 +163,6 @@ export const DASHBOARD: readonly DashboardTab[] = [
                 title: 'Active subscription lines by customer',
                 span: 3,
                 source: { table: 'x_daas_ham_subscription_line', filter: `status=${SUBSCRIPTION_LINE_STATUS.active}` },
-                audience: 'broadStaff',
             },
         ],
     },

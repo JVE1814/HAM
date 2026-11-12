@@ -54,11 +54,13 @@ The workspace already lists the rows of every missing tile but the SLA ones: *Re
   drill to no other (`catalog.test.ts`).
 - A tile on `alm_hardware` holds the fleet condition in every clause of its filter (ADR 0016,
   `catalog.test.ts`).
-- A tile is offered only to roles that read its table. `built-metadata.test.ts` holds each tile's
-  audience to the read ACLs the app builds on its table (plan 007). A tile takes its audience from
-  its own `audience`, else from its drill list, else from its tab.
-- The three tabs other than Margin are offered to every provider-staff role, and a test pins
-  that. A new tab would have to change that test.
+- A tile is offered only to roles that read its table and every app table its filter's fields
+  point at. `built-metadata.test.ts` holds each tile's audience to the read ACLs the app builds on
+  those tables (plan 007, widened when a reference field to an unreadable table refused the
+  Billing tiles to inventory techs). A tile takes its audience from its own `audience`, else from
+  its drill list, else from its tab.
+- Operations and Lifecycle risk are offered to every provider-staff role, Billing integrity to the
+  broad staff, and a test pins that. A new tab would have to change that test.
 
 ## Tiles the existing kinds cover
 

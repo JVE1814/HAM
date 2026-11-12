@@ -454,10 +454,11 @@ billing consumer's user holds `x_daas_ham.billing_reader` and no longer `x_daas_
 (`PROVIDER_STAFF` in `src/server/domain/roles.ts`) and for app administrators, and for no
 Customer contact (the page's ACL). Its sidebar offers a role only the lists of its audience
 (`catalog.ts`), and each list shows what the table's ACLs and before-query rules let the user
-read. As a NOC-only or inventory-tech-only user, Operations,
-Billing integrity and Lifecycle risk show counts and the Margin tab is not offered; an inventory
-tech is not offered the subscription-line and reconciliation-exception tiles, nor *In service on a
-line not yet started*, whose filter reads the line. As finance, the Margin tab
+read. As a NOC-only user, Operations, Billing integrity and Lifecycle risk show counts and the
+Margin tab is not offered. As an inventory-tech-only user, Operations and Lifecycle risk show
+counts, and neither Billing integrity (each of its tiles reads Subscription lines) nor Margin is
+offered; the tech is not offered the reconciliation-exception tiles, nor the list *Data gaps (no
+tag, serial, agreement or site)*, whose filter reads the Agreement. As finance, the Margin tab
 shows figures, each in its own currency. As a non-admin staff user, *Overdue returns*, *Agreements
 up for renewal* and the Margin tiles (`javascript:gs.…` dates in the query) and *My staging tasks*
 (`assigned_toDYNAMIC`) show rows, and every list has its column labels (`/api/now/ui/meta`).

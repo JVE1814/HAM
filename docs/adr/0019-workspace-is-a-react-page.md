@@ -38,12 +38,16 @@ standalone page. Whether embedding was ever tried is not recorded.
   `generated/keys.ts`. `src/fluent/workspace/` holds the page and its ACL only.
 - What the built workspace records guaranteed is held by tests over the catalog instead. `built-metadata.test.ts`
   checks that the page's read ACL is provider staff's and the navigator module opens it, that each audience equals its
-  role group, that a widget is offered only to roles that read its table and money tables only to money readers, and
+  role group, that a widget or a list is offered only to roles that read its table and every app table its filter's
+  fields point at, and money tables only to money readers, and
   that every list column is a column of its table. `workspace/catalog.test.ts` checks that every list and widget on a
   table shared with the Provider's IT carries the fleet condition in each `^NQ` clause, for any search and sort a user
   picks (ADR 0016).
-- A widget offered to a role that cannot read its table would show a refusal, not data: the ACL still decides. The
-  audience check above exists so that no role is offered such a widget.
+- A widget offered to a role that cannot read its table would show a refusal, not data: the ACL still decides. So
+  would a widget or a list whose filter names a reference field to a table the role cannot read: the instance lets a
+  role read a reference field only when it reads the field's table, and a Stats count that dot-walks through one
+  matches nothing. The audience check above exists so that no role is offered either. It reads the app's own
+  dictionary and ACLs, so a reference to a platform table is not checked.
 - An upgrade from a version with the Next Experience workspace carries a delete for each of its records. What to check
   on the instance afterwards is in
   [NaaS Asset Workspace](../verify-on-instance.md#naas-asset-workspace), with what each role sees on the page.

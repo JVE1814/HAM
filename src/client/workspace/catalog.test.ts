@@ -66,8 +66,10 @@ describe('the workspace catalog', () => {
 
     it('offers a session only the lists and tabs of the audiences it holds', () => {
         const tech = holding(ROLE.inventoryTech)
-        expect(menuFor(tech).flatMap((category) => category.lists).every((list) => list.audience === 'staff')).toBe(true)
-        expect(tabsFor(tech).map((tab) => tab.id)).not.toContain('margin')
+        const techLists = menuFor(tech).flatMap((category) => category.lists)
+        expect(techLists.every((list) => list.audience === 'staff')).toBe(true)
+        expect(techLists.map((list) => list.id)).not.toContain('assets_data_gaps')
+        expect(tabsFor(tech).map((tab) => tab.id)).toEqual(['operations', 'risk'])
         expect(tabsFor(holding(ROLE.finance)).map((tab) => tab.id)).toContain('margin')
         expect(menuFor(holding())).toEqual([])
         expect(menuFor(holding(ROLE.admin)).flatMap((category) => category.lists).map((list) => list.id)).toEqual(['admin_jobs'])
@@ -98,10 +100,19 @@ describe('the workspace dashboard', () => {
 
     it('offers a role only the widgets on tables it reads, and no tab left without one', () => {
         const widgetsFor = (...roles: string[]) => tabsFor(holding(...roles)).flatMap((tab) => tab.widgets.map((widget) => widget.id))
-        const broadStaffOnly = ['pending_line_in_service', 'ended_lines_no_end_date', 'pending_lines', 'lines_by_customer', 'open_exceptions', 'exception_types']
+        const broadStaffOnly = [
+            'unbilled_in_service',
+            'pending_line_in_service',
+            'ended_line_in_service',
+            'ended_lines_no_end_date',
+            'pending_lines',
+            'lines_by_customer',
+            'open_exceptions',
+            'exception_types',
+        ]
         const forTech = widgetsFor(ROLE.inventoryTech)
         for (const id of broadStaffOnly) expect(forTech, id).not.toContain(id)
-        expect(forTech).toEqual(expect.arrayContaining(['open_orders', 'unbilled_in_service', 'ended_line_in_service', 'past_support', 'open_returns', 'phase']))
+        expect(forTech).toEqual(expect.arrayContaining(['open_orders', 'past_support', 'open_returns', 'phase']))
         expect(widgetsFor(ROLE.noc)).toEqual(expect.arrayContaining(broadStaffOnly))
         expect(widgetsFor(ROLE.finance)).toEqual(WIDGETS.map((widget) => widget.id))
         expect(tabsFor(holding(ROLE.admin))).toEqual([])
