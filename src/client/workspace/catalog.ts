@@ -1,3 +1,4 @@
+import { ENDED_LINES_WITHOUT_END_DATE, IN_SERVICE_ON_PENDING_LINE } from '../../server/domain/billing'
 import { splitOrder, type Ordering } from '../../server/domain/encoded-query'
 import { INSTALLED_WITHOUT_COVERAGE } from '../../server/domain/coverage'
 import { FLEET_CONDITION, FLEET_INSTALLED, FLEET_IN_STAGE, INSTALLED_CONDITION, NAAS_MODEL_CONDITION, NAAS_MODEL_MILESTONES } from '../../server/domain/fleet'
@@ -346,6 +347,13 @@ const CATALOG = {
             columns: 'description,customer,agreement,line_type,site,device_class,monthly_rate,status,start_date',
             audience: 'broadStaff',
         },
+        lines_ended_no_end_date: {
+            title: 'Ended lines without an end date',
+            table: 'x_daas_ham_subscription_line',
+            query: ENDED_LINES_WITHOUT_END_DATE,
+            columns: 'description,customer,agreement,line_type,site,monthly_rate,status,start_date,end_date',
+            audience: 'broadStaff',
+        },
         catalog_entries: {
             title: 'Catalog entries',
             table: 'x_daas_ham_catalog_entry',
@@ -410,6 +418,14 @@ const CATALOG = {
             query: 'end_dateISEMPTY^ORDERBYstart_date',
             columns: 'asset,subscription_line,customer,site,start_date,end_date',
             audience: 'money',
+        },
+        // Its filter reads the line's status, so it is offered to the roles that read Subscription lines.
+        assets_on_pending_line: {
+            title: 'In service on a line not yet started',
+            table: 'alm_hardware',
+            query: IN_SERVICE_ON_PENDING_LINE,
+            columns: `${INSTALLED_ASSET_COLUMNS},x_daas_ham_subscription_line`,
+            audience: 'broadStaff',
         },
         margin: {
             title: 'Margin by customer and site',

@@ -98,7 +98,7 @@ describe('the workspace dashboard', () => {
 
     it('offers a role only the widgets on tables it reads, and no tab left without one', () => {
         const widgetsFor = (...roles: string[]) => tabsFor(holding(...roles)).flatMap((tab) => tab.widgets.map((widget) => widget.id))
-        const broadStaffOnly = ['pending_lines', 'lines_by_customer', 'open_exceptions', 'exception_types']
+        const broadStaffOnly = ['pending_line_in_service', 'ended_lines_no_end_date', 'pending_lines', 'lines_by_customer', 'open_exceptions', 'exception_types']
         const forTech = widgetsFor(ROLE.inventoryTech)
         for (const id of broadStaffOnly) expect(forTech, id).not.toContain(id)
         expect(forTech).toEqual(expect.arrayContaining(['open_orders', 'unbilled_in_service', 'ended_line_in_service', 'past_support', 'open_returns', 'phase']))

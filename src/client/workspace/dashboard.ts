@@ -1,4 +1,4 @@
-import { IN_SERVICE_ON_ENDED_LINE, IN_SERVICE_UNBILLED } from '../../server/domain/billing'
+import { ENDED_LINES_WITHOUT_END_DATE, IN_SERVICE_ON_ENDED_LINE, IN_SERVICE_ON_PENDING_LINE, IN_SERVICE_UNBILLED } from '../../server/domain/billing'
 import { INSTALLED_WITHOUT_COVERAGE } from '../../server/domain/coverage'
 import { FLEET_INSTALLED, FLEET_IN_STAGE } from '../../server/domain/fleet'
 import { OPEN_ORDERS_QUERY, ORDERS_AWAITING_APPROVAL_QUERY } from '../../server/domain/fulfilment'
@@ -125,11 +125,27 @@ export const DASHBOARD: readonly DashboardTab[] = [
                 source: { table: 'alm_hardware', filter: IN_SERVICE_UNBILLED },
             },
             {
+                id: 'pending_line_in_service',
+                chart: 'score',
+                title: 'In service on a line not yet started',
+                span: 3,
+                source: { table: 'alm_hardware', filter: IN_SERVICE_ON_PENDING_LINE },
+                drill: 'assets_on_pending_line',
+            },
+            {
                 id: 'ended_line_in_service',
                 chart: 'score',
                 title: 'In service on an ended line',
                 span: 3,
                 source: { table: 'alm_hardware', filter: IN_SERVICE_ON_ENDED_LINE },
+            },
+            {
+                id: 'ended_lines_no_end_date',
+                chart: 'score',
+                title: 'Ended lines without an end date',
+                span: 3,
+                source: { table: 'x_daas_ham_subscription_line', filter: ENDED_LINES_WITHOUT_END_DATE },
+                drill: 'lines_ended_no_end_date',
             },
             {
                 id: 'pending_lines',

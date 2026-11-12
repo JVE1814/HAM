@@ -426,7 +426,8 @@ Customer contact (the page's ACL). Its sidebar offers a role only the lists of i
 (`catalog.ts`), and each list shows what the table's ACLs and before-query rules let the user
 read. As a NOC-only or inventory-tech-only user, Operations,
 Billing integrity and Lifecycle risk show counts and the Margin tab is not offered; an inventory
-tech is not offered the subscription-line and reconciliation-exception tiles. As finance, the Margin tab
+tech is not offered the subscription-line and reconciliation-exception tiles, nor *In service on a
+line not yet started*, whose filter reads the line. As finance, the Margin tab
 shows figures, each in its own currency. As a non-admin staff user, *Overdue returns*, *Agreements
 up for renewal* and the Margin tiles (`javascript:gs.…` dates in the query) and *My staging tasks*
 (`assigned_toDYNAMIC`) show rows, and every list has its column labels (`/api/now/ui/meta`).
@@ -872,7 +873,8 @@ refused too.
 **After an upgrade:** a line set *Ended* without an End date before this release is still billed
 every month, and the rule refuses its next save until it has one. List Subscription lines with
 *Status* *Ended* and an empty *End date* (`status=ended^end_dateISEMPTY`), and give each the last
-day it should be billed. A Billing period still *Ready for review* that billed such a line past
+day it should be billed. The workspace counts them on the *Billing integrity* tab, tile *Ended
+lines without an end date*, and lists them under *Commercial*. A Billing period still *Ready for review* that billed such a line past
 that day is put right with *Regenerate*. A closed period is not changed: credit it by hand.
 
 ### Service interval not yet started

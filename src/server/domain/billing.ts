@@ -135,6 +135,23 @@ const ON_ENDED_LINE = `x_daas_ham_subscription_line.status=${SUBSCRIPTION_LINE_S
  */
 export const IN_SERVICE_ON_ENDED_LINE = `install_status=${STAGE_FIELDS.in_service.installStatus}^substatusISEMPTY^${ON_ENDED_LINE}^${FLEET_CONDITION}^NQinstall_status=${STAGE_FIELDS.temporary_deployment.installStatus}^substatus=${STAGE_FIELDS.temporary_deployment.substatus}^${ON_ENDED_LINE}^${FLEET_CONDITION}`
 
+const ON_PENDING_LINE = `x_daas_ham_subscription_line.status=${SUBSCRIPTION_LINE_STATUS.pending}`
+
+/**
+ * Encoded query on alm_hardware for the Billing integrity dashboard: fleet assets (ADR 0016) in a billed stage whose
+ * Subscription line is still pending. Generation bills no pending line, so nothing bills them. Go-live starts a pending
+ * line as it attaches a unit (platform/subscriptions), so only a line set on the Asset by hand leaves one here. It is
+ * `fleetStagesQuery(IN_USE_STAGES, ON_PENDING_LINE)` written out, as IN_SERVICE_ON_ENDED_LINE is.
+ */
+export const IN_SERVICE_ON_PENDING_LINE = `install_status=${STAGE_FIELDS.in_service.installStatus}^substatusISEMPTY^${ON_PENDING_LINE}^${FLEET_CONDITION}^NQinstall_status=${STAGE_FIELDS.temporary_deployment.installStatus}^substatus=${STAGE_FIELDS.temporary_deployment.substatus}^${ON_PENDING_LINE}^${FLEET_CONDITION}`
+
+/**
+ * Encoded query on x_daas_ham_subscription_line for the Billing integrity dashboard: the lines endedLineProblem
+ * refuses, saved before its rule or past it. Billing takes each as still open and bills it every month until it is
+ * given its End date.
+ */
+export const ENDED_LINES_WITHOUT_END_DATE = `status=${SUBSCRIPTION_LINE_STATUS.ended}^end_dateISEMPTY`
+
 /**
  * The Assets that keep a site package open, as an encoded alm_hardware query: the fleet assets (ADR 0016) at its Site
  * under its Agreement on their way there, serving there or on their way back. A unit received at the depot or declared

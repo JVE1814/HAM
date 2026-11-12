@@ -7,8 +7,10 @@ import {
     billsFromIntervals,
     currencyTotals,
     decideGenerationReset,
+    ENDED_LINES_WITHOUT_END_DATE,
     endedLineProblem,
     IN_SERVICE_ON_ENDED_LINE,
+    IN_SERVICE_ON_PENDING_LINE,
     IN_SERVICE_UNBILLED,
     intervalEnd,
     PULL_PAGE,
@@ -393,6 +395,37 @@ describe('IN_SERVICE_ON_ENDED_LINE', () => {
         expect(ALL_STAGES.filter((stage) => flagged({ ...billed('ended', ''), ...assetIn(stage) }))).toEqual([...IN_USE_STAGES])
         expect(flagged({ ...billed('ended', ''), x_daas_ham_fleet: 'false' })).toBe(false)
         expect(flagged({ ...billed('active', '2026-11-08'), ...assetIn('temporary_deployment'), x_daas_ham_fleet: '' })).toBe(false)
+    })
+})
+
+describe('IN_SERVICE_ON_PENDING_LINE', () => {
+    const flagged = (asset: SampleRecord) => matches(IN_SERVICE_ON_PENDING_LINE, asset)
+    const LINE = 'x_daas_ham_subscription_line'
+    const on = (status: string, fields: SampleRecord = {}) => assetIn('in_service', { x_daas_ham_fleet: 'true', [LINE]: 'sl1', [`${LINE}.status`]: status, ...fields })
+
+    it('flags fleet assets in a billed stage on a line still pending, which generation leaves out', () => {
+        expect(flagged(on('pending'))).toBe(true)
+        expect(ALL_STAGES.filter((stage) => flagged({ ...on('pending'), ...assetIn(stage) }))).toEqual([...IN_USE_STAGES])
+    })
+
+    it("leaves out an asset on a line that runs or has ended, one on no line, and the Provider IT's (ADR 0016)", () => {
+        expect(flagged(on('active'))).toBe(false)
+        expect(flagged(on('ended'))).toBe(false)
+        expect(flagged(on('', { [LINE]: '' }))).toBe(false)
+        expect(flagged(on('pending', { x_daas_ham_fleet: 'false' }))).toBe(false)
+        expect(flagged({ ...on('pending'), ...assetIn('temporary_deployment'), x_daas_ham_fleet: '' })).toBe(false)
+    })
+})
+
+describe('ENDED_LINES_WITHOUT_END_DATE', () => {
+    it('finds exactly the Subscription lines a save is refused for: set Ended, with no End date', () => {
+        const found = (status: string, endDate: string) => matches(ENDED_LINES_WITHOUT_END_DATE, { status, end_date: endDate })
+        expect(found('ended', '')).toBe(true)
+        for (const status of ['pending', 'active', 'ended']) {
+            for (const endDate of ['', '2026-11-12']) {
+                expect(found(status, endDate), `${status} ${endDate}`).toBe(endedLineProblem({ status, endDate }) !== null)
+            }
+        }
     })
 })
 

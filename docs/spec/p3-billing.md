@@ -60,9 +60,18 @@
   app's own ending of a site package sets both. A line saved *Ended* without an End date before
   this rule keeps being billed until it is given one (*Ended subscription lines* in
   `docs/verify-on-instance.md`).
-- The *Billing integrity* tab counts fleet assets only (ADR 0016): the Provider IT's equipment in use
-  shares `alm_hardware` and is never billed. Its tile *In service without a subscription line*
-  counts fleet assets in service with no Subscription line, which bill nothing.
+- The asset tiles of the *Billing integrity* tab count fleet assets only (ADR 0016): the Provider
+  IT's equipment in use shares `alm_hardware` and is never billed. Its tile *In service without a
+  subscription line* counts fleet assets in service with no Subscription line, which bill nothing.
+  *In service on a line not yet started* counts fleet assets in service or on a temporary
+  deployment whose Subscription line is still *Pending*. Generation bills no pending line, so they
+  bill nothing either. Go-live starts a pending line as it attaches a unit, so only a line set on
+  the Asset by hand leaves one there: move the unit to a line that runs. *Ended lines without an
+  end date* counts Subscription lines set *Ended* with no End date, which are billed every month
+  until each is given its last day. The rule above refuses new ones, and the tile finds those
+  saved before it or past it. Each of these two tiles opens the list of what it counts (*In
+  service on a line not yet started* under Billing, *Ended lines without an end date* under
+  Commercial), and both are offered to the roles that read Subscription lines.
 - Open **Fee events** up to the month end (lost, damaged, late return) are added once, each as its
   own line. A fee a *Regenerate* no longer bills (its date moved past the month end, or it fails
   to bill) leaves the period, so *Close period* does not mark it billed and a later month bills it.
