@@ -21,7 +21,7 @@ import { assetManagerIds } from './users.ts'
  * was not asked, so the provider-side approvers asked in their place still stand in; an admin whose role was removed
  * meanwhile still decides only for the admins.
  */
-const CUSTOMER_ADMINS_ASKED = 'approval_customer_admins'
+export const CUSTOMER_ADMINS_ASKED = 'approval_customer_admins'
 
 export function customerAdminIds(customerId: string): string[] {
     if (!customerId) return []

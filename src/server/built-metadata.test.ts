@@ -42,6 +42,7 @@ import {
 import { clearVoidedWipeEvidence, explainLifecycleRefusal, refusesLifecycleChange } from './entry/assets'
 import { onAssetServiceChange } from './entry/billing'
 import { explainWorkWindowRefusal, refusesWorkWindow } from './entry/delivery'
+import { CUSTOMER_ADMINS_ASKED } from './platform/approvals'
 import { completeInstallOfWork } from './platform/delivery'
 import { onDisposalApprovalDecision } from './entry/disposal'
 import { onModelLifecycleChanged } from './entry/models'
@@ -537,6 +538,19 @@ describe('the Job lock name column', () => {
     it('holds a name as long as the server code cuts lock names to: one the instance cut shorter would be another lock', () => {
         const name = builtColumns().find((column) => column.table === 'x_daas_ham_job_lock' && column.name === 'name')
         expect(Number(name?.max_length)).toBeGreaterThanOrEqual(LOCK_NAME_LENGTH)
+    })
+})
+
+describe('the tables whose approvals are rolled up', () => {
+    // On a table without the column the save is dropped silently, and any approver then counts for the Customer admins.
+    it('save the Customer admins a task was put to approval with', () => {
+        const approved = records('sys_script')
+            .filter((rule) => rule.collection === 'sysapproval_approver')
+            .flatMap((rule) => /current\.source_table == '(\w+)'/.exec(rule.condition ?? '')?.[1] ?? [])
+        expect(approved).toEqual(expect.arrayContaining(['x_daas_ham_order', 'x_daas_ham_disposal_order']))
+        const columns = builtColumns()
+        const without = approved.filter((table) => !columns.some((column) => column.table === table && column.name === CUSTOMER_ADMINS_ASKED))
+        expect(without).toEqual([])
     })
 })
 
