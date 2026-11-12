@@ -38,7 +38,6 @@ export interface Scan extends Context {
 
 export type Scanned = { mode: Exclude<Mode, 'audit'>; asset: AssetSummary } | { mode: 'audit'; code: string }
 
-/** The scan as it is queued: the code with the context it was scanned in. Only a receive carries the PID. */
 export function scanOf(context: Context, mode: Mode, code: string): Scan {
     return { ...context, mode, code, pid: mode === 'receive' ? context.pid.trim() : '' }
 }

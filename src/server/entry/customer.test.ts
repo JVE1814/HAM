@@ -6,8 +6,6 @@ import { RETURN_LINE_STATUS } from '../domain/vocabulary.ts'
 import { answerAttestation, requestCustomerReturn } from './customer.ts'
 import { platform, type Row } from '../test-support/fake-glide.ts'
 
-/* The customer page's routes on the in-memory stand-in for the platform, called as a Customer admin. */
-
 vi.mock('@servicenow/glide', async () => (await import('../test-support/fake-glide.ts')).glide)
 
 const RETURNS = 'x_daas_ham_return_order'

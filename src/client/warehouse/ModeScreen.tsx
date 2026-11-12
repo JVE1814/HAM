@@ -109,7 +109,7 @@ export function ModeScreen({ mode }: { mode: ModeSpec }) {
     )
 }
 
-/** Scans the server refused or never answered. They stay until rescanned or dismissed: each is a unit not received, picked or counted. */
+/** Scans the server refused or never answered. */
 function FailedScans({
     failed,
     onRescan,
