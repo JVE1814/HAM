@@ -4,7 +4,9 @@
 
 - **Service intervals** record the days each Asset delivered a Subscription line. A rule on stage
   changes opens one when the Asset enters service (in service or temporary): from its in-service
-  date on first go-live, else that day (e.g. a missing unit found again). The same rule closes it
+  date on first go-live (the first sighting since its install, also when the go-live was put off
+  to a later sighting: fulfilment spec, *In service and billing start*), else that day (e.g. a
+  missing unit found again). The same rule closes it
   the day the Asset leaves service (a Return order, declared missing, a manual move). Both days are
   billed. An Asset back in service on or before the day its interval on the same line closed gets
   that interval reopened, so no day is billed twice. The rule also runs when the stage change clears

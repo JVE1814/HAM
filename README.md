@@ -190,6 +190,9 @@ On an instance where an earlier version was installed:
   answered HTTP 403. Nothing is lost by that: a pull is a read, to send again. Where the NMS and
   the billing consumer shared one user, give the billing consumer a user of its own
   ([machine roles](docs/verify-on-instance.md#machine-roles)).
+- Nothing to enter for the new *First seen since install* on Assets
+  (`alm_hardware.x_daas_ham_first_seen`): an Asset pending in service since before the upgrade
+  has none, and goes in service from its last sighting since its install, as before.
 - Work through the checks marked **After an upgrade** in
   [docs/verify-on-instance.md](docs/verify-on-instance.md): adopting the fleet and clearing the
   earlier version's column defaults, and clean-ups of returns, fees and spare-pool purchases.

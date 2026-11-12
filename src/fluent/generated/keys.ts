@@ -22708,6 +22708,14 @@ declare global {
                     },
                     {
                         table: 'sys_dictionary'
+                        id: '4cfa9c43f2464ec49078bbddf46ac1ac'
+                        key: {
+                            name: 'alm_hardware'
+                            element: 'x_daas_ham_first_seen'
+                        }
+                    },
+                    {
+                        table: 'sys_dictionary'
                         id: '4d005a2afdfd484e819bfe3fd14dc97e'
                         key: {
                             name: 'x_daas_ham_service_interval'
@@ -52623,6 +52631,15 @@ declare global {
                             }
                             element: 'closed_at'
                             position: '11'
+                        }
+                    },
+                    {
+                        table: 'sys_documentation'
+                        id: 'ce4f90da5a344e1289f138034616a01c'
+                        key: {
+                            name: 'alm_hardware'
+                            element: 'x_daas_ham_first_seen'
+                            language: 'en'
                         }
                     },
                     {

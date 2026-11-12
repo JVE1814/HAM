@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { chooseSubscriptionLine, decideInService, seenSourceOf } from './in-service'
+import { chooseSubscriptionLine, decideInService, firstSeenSinceInstall, seenSourceOf } from './in-service'
 
 describe('decideInService', () => {
     const installed = { stage: 'pending_in_service' as const, installCompletedAt: 1_000, temporary: false }
@@ -17,12 +17,38 @@ describe('decideInService', () => {
         expect(decideInService({ ...installed, lastSeenAt: undefined })).toEqual({ goesLive: false, reason: 'not seen since install' })
     })
 
+    it('goes live from the first sighting since the install, not from a later one', () => {
+        expect(decideInService({ ...installed, firstSeenAt: 1_200, lastSeenAt: 1_500 })).toEqual({ goesLive: true, at: 1_200, stage: 'in_service' })
+    })
+
+    it('passes over a first sighting kept from before the install', () => {
+        expect(decideInService({ ...installed, firstSeenAt: 500, lastSeenAt: 1_500 })).toMatchObject({ goesLive: true, at: 1_500 })
+        expect(decideInService({ ...installed, firstSeenAt: 500, lastSeenAt: 900 })).toEqual({ goesLive: false, reason: 'not seen since install' })
+    })
+
     it('waits for the install to be completed', () => {
         expect(decideInService({ ...installed, installCompletedAt: undefined, lastSeenAt: 1_500 })).toEqual({ goesLive: false, reason: 'install not completed' })
     })
 
     it('ignores assets that are not pending in service', () => {
         expect(decideInService({ ...installed, stage: 'in_service', lastSeenAt: 1_500 })).toEqual({ goesLive: false, reason: 'not pending in service' })
+    })
+})
+
+describe('firstSeenSinceInstall', () => {
+    it('keeps the stored first sighting however far the last one has moved on', () => {
+        expect(firstSeenSinceInstall({ installCompletedAt: 1_000, firstSeenAt: 1_000, lastSeenAt: 9_000 })).toBe(1_000)
+    })
+
+    it('is the last sighting when none since the install is stored', () => {
+        expect(firstSeenSinceInstall({ installCompletedAt: 1_000, lastSeenAt: 1_500 })).toBe(1_500)
+        expect(firstSeenSinceInstall({ installCompletedAt: 1_000, firstSeenAt: 500, lastSeenAt: 1_500 })).toBe(1_500)
+    })
+
+    it('is none while the Asset is not seen since its install, or has no install time', () => {
+        expect(firstSeenSinceInstall({ installCompletedAt: 1_000, firstSeenAt: 500, lastSeenAt: 900 })).toBeUndefined()
+        expect(firstSeenSinceInstall({ installCompletedAt: 1_000 })).toBeUndefined()
+        expect(firstSeenSinceInstall({ firstSeenAt: 1_200, lastSeenAt: 1_500 })).toBeUndefined()
     })
 })
 

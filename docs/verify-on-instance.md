@@ -670,8 +670,10 @@ A go-live starts a pending Subscription line under `subscription_line_<line sys_
 that name in *Job lock*, a *seen* event for an Asset going live on that line is accepted. The Asset
 stays pending in service, two *Unique Key violation* errors a try are logged, and so is *[x_daas_ham]
 <serial> stays pending in service, line not started: another go-live held its lock through every
-try* (warning). Delete the row, or leave it until it is abandoned, and the next sighting starts the
-line.
+try* (warning). The Asset's *First seen since install* (`x_daas_ham_first_seen`, added to a list
+of Assets by hand) holds the time of that event. Delete the row, or leave it until it is
+abandoned, and the next sighting starts the line: the Asset's *In-service date* and the line's
+start date are those of the first event, not of the later sighting.
 
 ### Fee event and service interval locks
 
