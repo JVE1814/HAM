@@ -122,7 +122,7 @@
 |---|---|---|---|
 | Meraki | `inventory/claim` by serial into the Customer's organization; only serials in the returned `serials` count as claimed (a response without the field counts all) | — | — |
 | Mist | org inventory by **claim code** (already claimed counts as done; codes compared without dashes; a 400 with per-code results is read like a 200) | — | — |
-| Aruba (GreenLake) | add device by serial + **MAC** to the Provider's workspace, a capped number per call (`GREENLAKE_ADD_BATCH` in `domain/oem/claim-adapters.ts`; `network`, with `compute` and `storage` empty) | find the device, assign the Customer's subscription (merge-patch JSON); a device already carrying it counts as done | — |
+| Aruba (GreenLake) | add device by serial + **MAC** to the Provider's workspace, a capped number per call (`GREENLAKE_ADD_BATCH` in `domain/oem/claim-adapters.ts`; `network`, with `compute` and `storage` empty) | find the device by its serial (only a device GreenLake returns with that serial counts as found; any other assigns nothing and fails the step), assign the Customer's subscription (merge-patch JSON); a device already carrying it counts as done | — |
 | Fortinet | FortiCloud product registration (Provider account) | — | FortiZTP: provision to the Customer's FortiManager |
 | Check Point | — | — | Zero Touch web API v2: `login`, `claim-gateway` (serial as object name, account id, template id, MAC), `logout`; login and logout count as calls |
 

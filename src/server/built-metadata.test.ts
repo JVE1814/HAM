@@ -83,7 +83,7 @@ vi.mock('@servicenow/glide/sn_ws', () => ({
         setRequestHeader() {}
         setRequestBody() {}
         execute() {
-            return { getStatusCode: () => 200, getBody: () => JSON.stringify({ sid: 'session', items: [{ id: 'device' }] }) }
+            return { getStatusCode: () => 200, getBody: () => JSON.stringify({ sid: 'session', items: [{ id: 'device', serialNumber: 'SERIAL' }] }) }
         }
     },
 }))

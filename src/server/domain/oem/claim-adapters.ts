@@ -143,13 +143,23 @@ const greenLakeSubscribe: ClaimAdapter = (targets, http, maxCalls) => {
     let calls = 0
     for (const t of usable) {
         if (calls + GREENLAKE_SUBSCRIBE_CALLS > maxCalls) break
-        const found = http({ fn: REST_MESSAGE.greenLake.fn.findDevice, params: { serial: t.serial } })
+        // The serial sits in a quoted OData string of the filter, where a quote is written twice; the transport's URL
+        // encoding leaves a quote as it is.
+        const found = http({ fn: REST_MESSAGE.greenLake.fn.findDevice, params: { serial: t.serial.replace(/'/g, "''") } })
         if (found === LOCK_LOST) break
         calls++
-        const device = isSuccess(found.status) ? asArray(field(parseJson(found.body), 'items'))[0] : undefined
+        if (!isSuccess(found.status)) {
+            outcomes.push({ stepId: t.stepId, ok: false, message: failureText(found) })
+            continue
+        }
+        // Only a device answered with the serial asked for is the Asset's: the subscription is the Customer's.
+        const wanted = normalizeSerial(t.serial)
+        const items = asArray(field(parseJson(found.body), 'items'))
+        const device = items.find((item) => wanted !== '' && normalizeSerial(text(field(item, 'serialNumber'))) === wanted)
         const deviceId = text(field(device, 'id'))
         if (!deviceId) {
-            outcomes.push({ stepId: t.stepId, ok: false, message: isSuccess(found.status) ? 'device not in the GreenLake workspace yet' : failureText(found) })
+            const message = items.length > 0 && !device ? 'GreenLake found another device for this serial: nothing assigned' : 'device not in the GreenLake workspace yet'
+            outcomes.push({ stepId: t.stepId, ok: false, message })
             continue
         }
         if (asArray(field(device, 'subscription')).some((s) => text(field(s, 'id')).toLowerCase() === t.account.toLowerCase())) {

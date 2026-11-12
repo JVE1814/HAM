@@ -230,6 +230,34 @@ describe('GreenLake', () => {
             { stepId: 'A', ok: false, message: 'device not in the GreenLake workspace yet' },
         ])
     })
+
+    it('assigns nothing when the device GreenLake answers with has another serial', () => {
+        const { http, calls } = fake([devices(), accepted])
+        const result = GREENLAKE_SUBSCRIBE.run([target('B', { account: SUB })], http, 5)
+        expect(calls.map((c) => c.fn)).toEqual(['find_device'])
+        expect(result).toEqual({ outcomes: [{ stepId: 'B', ok: false, message: 'GreenLake found another device for this serial: nothing assigned' }], calls: 1 })
+    })
+
+    it('takes, of several devices, the one with the serial asked for, compared as the app compares serials', () => {
+        const body = JSON.stringify({ items: [{ id: 'other', serialNumber: 'Q2XX-B' }, { id: 'mine', serialNumber: ' q2xx-a ' }] })
+        const { http, calls } = fake([{ status: 200, body }, accepted])
+        GREENLAKE_SUBSCRIBE.run([target('A', { account: SUB })], http, 5)
+        expect(calls.map((c) => c.fn)).toEqual(['find_device', 'assign_subscription'])
+        expect(calls[1]).toMatchObject({ params: { device_id: 'mine' } })
+    })
+
+    it('never takes a device that names no serial, even for a blank serial', () => {
+        const { http, calls } = fake([{ status: 200, body: JSON.stringify({ items: [{ id: 'dev-1' }] }) }, accepted])
+        const result = GREENLAKE_SUBSCRIBE.run([target('A', { serial: ' ', account: SUB })], http, 5)
+        expect(calls.map((c) => c.fn)).toEqual(['find_device'])
+        expect(result.outcomes).toEqual([{ stepId: 'A', ok: false, message: 'GreenLake found another device for this serial: nothing assigned' }])
+    })
+
+    it("doubles a quote in the serial, so it stays inside the filter's string literal", () => {
+        const { http, calls } = fake([{ status: 200, body: JSON.stringify({ items: [] }) }])
+        GREENLAKE_SUBSCRIBE.run([target('A', { serial: "X' or serialNumber ne '" })], http, 5)
+        expect(calls[0]).toMatchObject({ fn: 'find_device', params: { serial: "X'' or serialNumber ne ''" } })
+    })
 })
 
 describe('Fortinet', () => {
@@ -369,7 +397,7 @@ function fakeTransport(responses: Array<HttpResponse | ((request: HttpRequest) =
 /** Answers every vendor function with success (GreenLake finds the device, Zero Touch logs in, FortiCloud status 0). */
 const succeed = (request: HttpRequest): HttpResponse =>
     request.fn === 'find_device'
-        ? { status: 200, body: JSON.stringify({ items: [{ id: 'dev-1' }] }) }
+        ? { status: 200, body: JSON.stringify({ items: [{ id: 'dev-1', serialNumber: request.params.serial }] }) }
         : request.fn === 'login'
           ? { status: 200, body: JSON.stringify({ sid: 'sid-1' }) }
           : { status: 200, body: JSON.stringify({ status: 0 }) }
