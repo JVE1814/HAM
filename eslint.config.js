@@ -13,6 +13,12 @@ const EXTENSIONLESS = {
     message: 'Name the .ts file: the instance resolves a server module import by its exact path.',
 }
 
+/** The build installs a server module that imports JSON with an import the instance cannot resolve, and every check passes. */
+const JSON_IMPORT = {
+    regex: '\\.json$',
+    message: 'A server module cannot import JSON: the instance cannot resolve it. Write the value out.',
+}
+
 const SERVER_FILES = 'src/server/**/*.{ts,tsx,mts,cts,js,mjs,cjs}'
 
 /** Test code: what the build leaves out of the server modules, so the layer rules do not apply to it. */
@@ -93,6 +99,7 @@ export default tseslint.config(
                 'error',
                 {
                     patterns: [
+                        JSON_IMPORT,
                         EXTENSIONLESS,
                         { regex: '^@servicenow/glide', message: 'The domain core never imports Glide (ADR 0003).' },
                         { regex: '/(platform|entry)/', message: 'The domain core imports nothing above it (ADR 0003).' },
@@ -107,7 +114,7 @@ export default tseslint.config(
         rules: {
             'no-restricted-imports': [
                 'error',
-                { patterns: [EXTENSIONLESS, { regex: '/entry/', message: 'Platform never imports entry points (ADR 0003).' }] },
+                { patterns: [JSON_IMPORT, EXTENSIONLESS, { regex: '/entry/', message: 'Platform never imports entry points (ADR 0003).' }] },
             ],
         },
     },
@@ -120,6 +127,7 @@ export default tseslint.config(
                 'error',
                 {
                     patterns: [
+                        JSON_IMPORT,
                         EXTENSIONLESS,
                         {
                             regex: '^\\./|/entry/',
