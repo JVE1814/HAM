@@ -27,8 +27,9 @@
   ownership rule above is refused with *Order not raised* and the reasons, and nothing is stored
   (`platform/orders.ts` `contactOrderInsertRefusal`). A contact's insert by hand (a form, the Table
   API) keeps no posted value, as they are an external user, and fails the Order create rule; the
-  check guards the record producer and any other insert that keeps the values. So only an Order
-  raised by provider staff or the service desk stays a draft to correct.
+  check guards the record producer and any other insert that keeps the values. So an Order that
+  names records not of its Customer stays a draft only when provider staff or the service desk
+  raised it.
 
 ## Entitlement (`domain/entitlement.ts`)
 
