@@ -19,6 +19,7 @@ import {
     type StoredBillingLine,
     type SubscriptionLineTerms,
 } from '../domain/billing.ts'
+import { JOB } from '../domain/chunked-job.ts'
 import { chooseCurrency, currencyOrThrow, monthBounds, overlapsMonth, type AgreementCurrency, type MonthBounds } from '../domain/money.ts'
 import { appendTo } from '../domain/collections.ts'
 import { messageOf } from '../domain/errors.ts'
@@ -67,19 +68,15 @@ export function openBillingPeriod(month: string): void {
 }
 
 /*
- * Generation. A period's generation passes replace each other on its job cursor `billing_generate_<sys_id>`
+ * Generation. A period's generation passes replace each other on its job cursor (`JOB.billingGenerate`)
  * (ADR 0007): the row names the current pass ('' once reset by hand), and its last run is
  * when that pass last started a chunk, its activity. No lock is taken: a pass starts where it is triggered.
  */
 
-function generationJob(periodId: string): string {
-    return `billing_generate_${periodId}`
-}
-
 function startGeneration(period: GlideRecord): string | null {
     const periodId = period.getUniqueValue()
     try {
-        queuePass(EVENT.billingGenerate, period, periodId, generationJob(periodId))
+        queuePass(EVENT.billingGenerate, period, periodId, JOB.billingGenerate(periodId))
         return null
     } catch (error) {
         return messageOf(error)
@@ -108,7 +105,7 @@ export function generateChunk(queued: JobEvent): void {
         return void log.warn(`${queued.name}: dropped a generation chunk, as there is no billing period '${queued.subject}'`)
     }
     if (str(period, 'status') !== BILLING_PERIOD_STATUS.generating) return
-    const job = generationJob(queued.subject)
+    const job = JOB.billingGenerate(queued.subject)
     try {
         recordActivity(job)
         const bounds = monthBounds(str(period, 'period'))
@@ -474,7 +471,7 @@ function regenerateReady(period: GlideRecord): PeriodOutcome {
  */
 export function resetGeneration(period: GlideRecord): PeriodOutcome {
     const name = str(period, 'period')
-    const job = generationJob(period.getUniqueValue())
+    const job = JOB.billingGenerate(period.getUniqueValue())
     const pass = findJobCursor(job)
     const lastChunk = pass ? pass.lastRun : ''
     const activity = [glideToMs(str(period, 'sys_updated_on')), glideToMs(lastChunk)]

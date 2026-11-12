@@ -24,9 +24,9 @@ import { naasMenu } from '../shared/menu.now'
 /**
  * One row per background job. Most are cursors (ADR 0007):
  * where a scheduled chunked job stopped, so the next run resumes there, or, for a job whose passes replace each other
- * (`margin_<period>`, `billing_generate_<period>`), the current pass's token. Two rows are not cursors and are kept
- * here under the names they have always had, so an upgrade keeps them: `provider_tag_sequence`, whose Cursor is the
- * last Provider tag number issued, and `preflight`, whose Last status is the preflight check's last result.
+ * (`JOB.margin`, `JOB.billingGenerate`), the current pass's token. Two rows are not cursors: `JOB.providerTagSequence`,
+ * whose Cursor is the last Provider tag number issued, and `JOB.preflight`, whose Last status is the preflight check's
+ * last result. domain/chunked-job `JOB` names every row.
  */
 export const x_daas_ham_job_cursor = Table({
     name: 'x_daas_ham_job_cursor',

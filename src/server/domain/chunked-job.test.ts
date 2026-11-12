@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import {
     cursorReport,
     isCurrentPass,
+    JOB,
     lockLostIn,
     passParm,
     readPassParm,
@@ -283,5 +284,19 @@ describe('lockLostIn', () => {
             outcome: 'lost',
             error: 'insert refused',
         })
+    })
+})
+
+describe('JOB', () => {
+    it('gives every job a row of its own, whatever period a per-period job runs for', () => {
+        const names = Object.values(JOB)
+        const fixed = names.flatMap((name) => (typeof name === 'string' ? [name] : []))
+        const perPeriodPrefixes = names.flatMap((name) => (typeof name === 'function' ? [name('')] : []))
+        expect(new Set(fixed).size).toBe(fixed.length)
+        expect(new Set(perPeriodPrefixes).size).toBe(perPeriodPrefixes.length)
+        for (const prefix of perPeriodPrefixes) {
+            expect(fixed.filter((name) => name.startsWith(prefix)), prefix).toEqual([])
+            expect(perPeriodPrefixes.filter((other) => other !== prefix && other.startsWith(prefix)), prefix).toEqual([])
+        }
     })
 })

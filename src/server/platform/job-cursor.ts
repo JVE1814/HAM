@@ -5,13 +5,13 @@ import { log } from './log.ts'
 import { num, refusal, str } from './records.ts'
 
 /**
- * The rows of x_daas_ham_job_cursor (ADR 0007): one per job, behind a unique index on its name. Only this module reads
- * and writes the table. What a row's `cursor` holds depends on its job:
+ * The rows of x_daas_ham_job_cursor (ADR 0007): one per job (domain/chunked-job `JOB`), behind a unique index on its
+ * name. Only this module reads and writes the table. What a row's `cursor` holds depends on its job:
  * - a scheduled job (platform/chunked `runTableJob`): the key its last run stopped at, '' once a pass is complete;
- * - an event job whose passes replace each other (`margin_<period>`, `billing_generate_<period>`): the current pass's token;
- * - `provider_tag_sequence` (platform/tags): the last Provider tag number issued;
- * - `oem_claim_stranded` (platform/claim-steps): the last waiting step a claim run checked, '' once it checked them all;
- * - `preflight` (entry/preflight): nothing, its result is the row's `last_status`.
+ * - an event job whose passes replace each other (`JOB.margin`, `JOB.billingGenerate`): the current pass's token;
+ * - `JOB.providerTagSequence` (platform/tags): the last Provider tag number issued;
+ * - `JOB.oemClaimStranded` (platform/claim-steps): the last waiting step a claim run checked, '' once it checked them all;
+ * - `JOB.preflight` (entry/preflight): nothing, its result is the row's `last_status`.
  */
 const TABLE = 'x_daas_ham_job_cursor'
 

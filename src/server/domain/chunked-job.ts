@@ -1,6 +1,23 @@
 import { messageOf } from './errors.ts'
 import { writeHoldingLock, type LockedWrite } from './job-lock.ts'
 
+/**
+ * Every job's row name in x_daas_ham_job_cursor, whose unique `job` column keys one row per job: two jobs given one
+ * name share a row. Installed instances hold these rows, so a name stays as it is.
+ */
+export const JOB = {
+    normalizeRawModels: 'normalize_raw_models',
+    inServiceDetection: 'in_service_detection',
+    chaseOverdueReturns: 'chase_overdue_returns',
+    reconcileInstalledBase: 'reconcile_installed_base',
+    sparePoolTopUp: 'spare_pool_top_up',
+    providerTagSequence: 'provider_tag_sequence',
+    oemClaimStranded: 'oem_claim_stranded',
+    preflight: 'preflight',
+    margin: (periodId: string) => `margin_${periodId}`,
+    billingGenerate: (periodId: string) => `billing_generate_${periodId}`,
+} as const
+
 /** The length of a Job cursor's Last status, which `save` cuts a status to. */
 export const JOB_STATUS_LENGTH = 255
 

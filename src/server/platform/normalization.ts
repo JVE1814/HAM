@@ -1,4 +1,5 @@
 import { GlideRecord } from '@servicenow/glide'
+import { JOB } from '../domain/chunked-job.ts'
 import { FLEET_CONDITION, OEM_PID_FIELD } from '../domain/fleet.ts'
 import {
     aliasedManufacturer,
@@ -133,7 +134,7 @@ export function normalizeNaasRawModels(): void {
     const data = loadNormalizationData()
     for (const rule of unusableRules(data.rules)) log.warn(`Model match rule skipped: its pattern ${rule.pattern} is not a regular expression`)
     runTableJob({
-        job: 'normalize_raw_models',
+        job: JOB.normalizeRawModels,
         table: RAW_MODEL_TABLE,
         query,
         read: (model) => ({ manufacturer: str(model, 'manufacturer.name'), model: str(model, 'name') }),
