@@ -45,14 +45,12 @@ describe('the tracking webhook, called as guest', () => {
         expect(post('guessed')).toEqual({ status: 401, body: { error: 'bad token' } })
     })
 
-    it('refuses every token while the configured one is shorter than the minimum, and warns without quoting it', () => {
+    it('refuses every token while the configured one is shorter than the minimum, and logs nothing', () => {
         const short = TOKEN.slice(0, WEBHOOK_TOKEN_MIN_LENGTH - 1)
         platform.properties = { [PROPERTY.shippingWebhookToken.name]: short }
         expect(post(short)).toEqual({ status: 401, body: { error: 'bad token' } })
-        expect(platform.warnings).toEqual([
-            expect.stringContaining(`${PROPERTY.shippingWebhookToken.name} is shorter than ${WEBHOOK_TOKEN_MIN_LENGTH} characters`),
-        ])
-        expect(platform.logs.join('\n')).not.toContain(short)
+        expect(post('guessed')).toEqual({ status: 401, body: { error: 'bad token' } })
+        expect(platform.logs).toEqual([])
     })
 
     it('logs nothing for a wrong token, or while no token is configured', () => {

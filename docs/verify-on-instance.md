@@ -46,7 +46,9 @@ label (*System Definition > Tables*) and its licensing row. A fresh install on a
 Run the on-demand job **NaaS - preflight check** (*System Definition > Scheduled Jobs*). Its row
 `preflight` in *NaaS Asset Management > Administration > Background jobs* reads *All prerequisites
 present*, as on the development instance on 2026-11-09. Otherwise it reads *N prerequisite(s)
-missing* and names them, each also logged as an error.
+missing* and names them, each also logged as an error. While `x_daas_ham.shipping.webhook_token`
+holds fewer than 32 characters it also reads *1 setting(s) to correct* and names that property, not
+its value; an empty token is not reported.
 
 ### Choices
 
@@ -102,10 +104,10 @@ posts with the token are each answered HTTP 200 *delivered*: the route runs as g
 that `gs.getProperty` returns the scoped password2 token to guest despite its admin read role
 (external-contracts.md N45). Where `x_daas_ham.shipping.webhook_token` was empty before the run,
 confirm it is empty again after. A configured token shorter than 32 characters fails this test with
-HTTP 401 on both posts: set a longer one first (README "Upgrading"). The scripts spell out their
-modules' installed path, which names the version in `package.json`: after a build,
-`src/server/built-metadata.test.ts` fails when the version changes, until the paths are updated to
-match.
+HTTP 401 on both posts and logs no warning for them; the preflight check names it. Set a longer
+one first (README "Upgrading"). The scripts spell out their modules' installed path, which names
+the version in `package.json`: after a build, `src/server/built-metadata.test.ts` fails when the
+version changes, until the paths are updated to match.
 
 ### Model lifecycle
 

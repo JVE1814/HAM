@@ -60,7 +60,8 @@
   `headers` or EasyPost's `custom_headers`), else in `?token=`; it must equal
   `x_daas_ham.shipping.webhook_token`, and nothing is accepted while that is empty or shorter than
   `WEBHOOK_TOKEN_MIN_LENGTH` (32 characters, `domain/shipping.ts`): a call is then answered HTTP
-  401 as for a wrong token, and logs a warning that names the property and no token. ShipEngine
+  401 as for a wrong token and logs nothing, since anyone can call the route; the preflight check
+  names the property (never the token) while it is set but too short. ShipEngine
   (`data.status_code`) and EasyPost tracker (`result.object = Tracker`, `result.status`) payloads are
   understood; other EasyPost events are refused, and the latest EasyPost tracking detail is the one
   with the latest `datetime`.
