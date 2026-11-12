@@ -6,9 +6,13 @@ is never replaced, returned, refreshed, declared missing, charged for or dispose
 ## Break-fix (Q46, Q58)
 
 - A CSM case names the **failed asset**, a fleet asset (the field offers fleet assets only). The case
-  takes the Agreement's replacement service level and the Asset's Customer. A failed asset outside the
-  fleet, set past the field's qualifier by a script, gives the case neither, and **Raise replacement**
-  refuses it (*Only a fleet asset is replaced*).
+  takes the Agreement's replacement service level and, when it names no account yet, the Asset's
+  Customer as its account. A failed asset outside the fleet, set past the field's qualifier by a
+  script, gives the case neither, and **Raise replacement** refuses it (*Only a fleet asset is
+  replaced*). A failed asset of another Customer than the case's account gives the case nothing
+  either and leaves its account as it is, and **Raise replacement** refuses it (*The failed asset is
+  not the case account's*): the Order is raised for the Asset's Customer, at its Site
+  (`domain/breakfix.ts` `isAnotherCustomers`).
 - **Raise replacement** (NOC, asset manager, CSM agent) creates a *device replace* Order: one line,
   same Model, *replaces asset* = the failed unit. The Order is submitted at once; one that Submit
   refuses (ordering spec) stays a draft, linked to the case, to correct and submit. If the Order or
