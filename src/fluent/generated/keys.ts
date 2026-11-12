@@ -8273,6 +8273,13 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_ux_lib_asset'
+                        id: '0c49fddd268a4cc5a125a935699c255c'
+                        key: {
+                            name: 'x_daas_ham/workspace/main-BXGoGtl8'
+                        }
+                    },
+                    {
                         table: 'sys_variable_value'
                         id: '0c4c4e1e440b4634a8e993f5798ae5ea'
                         key: {
@@ -36444,6 +36451,7 @@ declare global {
                     {
                         table: 'sys_ux_lib_asset'
                         id: '88a6f34fc6ab49acbcd7336f867a9524'
+                        deleted: true
                         key: {
                             name: 'x_daas_ham/workspace/main-BtptpYvN.js.map'
                         }
@@ -38585,6 +38593,13 @@ declare global {
                         key: {
                             rest_message: 'bd28c06489df4190bb20fade79e91641'
                             function_name: 'claim_inventory'
+                        }
+                    },
+                    {
+                        table: 'sys_ux_lib_asset'
+                        id: '929b3c8fb9ca432bbd58f8f1a6e0ec60'
+                        key: {
+                            name: 'x_daas_ham/workspace/main-BXGoGtl8.js.map'
                         }
                     },
                     {
@@ -59861,6 +59876,7 @@ declare global {
                     {
                         table: 'sys_ux_lib_asset'
                         id: 'f55cb5c6bb0c493bbd3b9069877eb059'
+                        deleted: true
                         key: {
                             name: 'x_daas_ham/workspace/main-BtptpYvN'
                         }
