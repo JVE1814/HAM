@@ -160,8 +160,11 @@ HTTP 422, so it can be sent again:
 
 A return request (`assets`) or an attestation's answers (`items`) that lists more than
 `MAX_LISTED_DEVICES` entries (`domain/customer-requests.ts`) answers HTTP 400 before anything is
-read or saved: the page lists only devices it was shown, and it is shown no more than that. A
-device a return request lists twice is read once.
+read or saved. The page lists only devices it was shown, and a return is shown no more than that.
+An attestation lists every device at its Site, so the page sends a long one in batches of at most
+`MAX_LISTED_DEVICES` answers, in order, and only the last batch submits it: a batch that fails
+stops the rest, and the attestation stays open with the answers saved so far. A device a return
+request lists twice is read once.
 
 New equipment is ordered through the *Request network equipment* record producer.
 

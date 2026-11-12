@@ -5,6 +5,7 @@ import { Empty, EmptyHeader, EmptyTitle } from '@/components/ui/empty'
 import type { Attestation, AttestationItem, AttestationReceipt } from '../../server/domain/rest-contracts'
 import { ATTESTATION_RESPONSE_CHOICES, type AttestationResponse } from '../../server/domain/vocabulary'
 import { customerApi, overviewKey, overviewQuery } from './api'
+import { attestationBatches } from './attestation-batches'
 import { useBusy } from './busy'
 
 const ANSWERS = (Object.keys(ATTESTATION_RESPONSE_CHOICES) as AttestationResponse[]).map((response) => ({
@@ -29,12 +30,11 @@ export function Attestations() {
 function AttestationForm({ attestation }: { attestation: Attestation }) {
     const busy = useBusy()
     const answer = useMutation({
-        mutationFn: (items: AttestationItem[]) =>
-            customerApi.answerAttestation(
-                attestation.id,
-                items.map(({ id, response }) => ({ id, response })),
-                true,
-            ),
+        mutationFn: async (items: AttestationItem[]) => {
+            const { saving, submitting } = attestationBatches(items.map(({ id, response }) => ({ id, response })))
+            for (const batch of saving) await customerApi.answerAttestation(attestation.id, batch, false)
+            return customerApi.answerAttestation(attestation.id, submitting, true)
+        },
         meta: { done: (r: AttestationReceipt) => `${r.attestation} submitted, thank you`, refresh: [overviewKey] },
     })
     const form = useAppForm({
