@@ -65,6 +65,17 @@ export default tseslint.config(
         ignores: TEST_CODE,
         rules: { 'no-restricted-syntax': ['error', STATIC_IMPORTS] },
     },
+    // An administrator picks the app's lines out of the system log by the scope that platform/log leads each with.
+    {
+        files: [SERVER_FILES],
+        ignores: [...TEST_CODE, 'src/server/platform/log.ts'],
+        rules: {
+            'no-restricted-properties': [
+                'error',
+                ...['info', 'warn', 'error'].map((property) => ({ object: 'gs', property, message: 'Log through platform/log, which leads the line with the scope.' })),
+            ],
+        },
+    },
     // A save without the business rules gets past the closed Billing period's lock, so it is made in one module.
     {
         files: ['src/server/{domain,platform,entry}/**/*.ts'],
