@@ -10,11 +10,11 @@ import {
     staleCoverageQuery,
     type AssetCoverage,
     type CoverageAnswer,
+    type CoverageDisposition,
     type SerialCoverage,
 } from '../domain/coverage.ts'
 import { FLEET_CONDITION } from '../domain/fleet.ts'
 import { parseCoverageRow } from '../domain/oem/adapters.ts'
-import type { CoverageFact } from '../domain/oem/types.ts'
 import { normalizeSerial } from '../domain/serials.ts'
 import type { CoverageSource, OemVendor } from '../domain/vocabulary.ts'
 import { nowGlide, todayIso } from './clock.ts'
@@ -39,8 +39,8 @@ export function staleAssets(vendor: OemVendor, staleBefore: string, limit: numbe
     return assets
 }
 
-/** What a serial's vendor said: its contracts (none: not covered), or an error of its own, which only stamps it checked. */
-export type SerialAnswer = { kind: 'apply'; facts: readonly CoverageFact[]; annualCost?: number } | { kind: 'stamp' }
+/** A vendor's answer for a serial that has something to write, with the annual cost a coverage import reads beside it. */
+export type SerialAnswer = Exclude<CoverageDisposition, { kind: 'skip' }> & { annualCost?: number }
 
 /** One serial's coverage to write: the Assets carrying it, in the order staleAssets gives them, and its vendor's answer. */
 export interface SerialWrite {
