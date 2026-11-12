@@ -48,7 +48,7 @@ Other scheduled jobs do not use the runner. Each bounds its work its own way, or
   `temporary_order_returns`, which hold only that position), starting over after the last. Each
   one raised is flagged and drops out. One left for a later run (a Return or its mark refused, an
   Order still being installed) stays, and no longer keeps those after it from being read; a run
-  that leaves every record it read logs a warning.
+  that reads a full page and leaves every record of it logs a warning.
 - Attestations (`platform/attestations.ts` `raiseDueAttestations`) read the Sites of each active
   Agreement with an attestation interval with one count of its in-service or temporarily deployed
   fleet assets grouped by Site, so no Asset row is read, then check each Site for an open

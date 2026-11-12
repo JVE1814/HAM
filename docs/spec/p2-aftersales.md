@@ -85,7 +85,8 @@ is never replaced, returned, refreshed, declared missing, charged for or dispose
 - The daily job reads at most 50 ended Agreements and 50 ending temporary Orders a run, each in
   sys_id order from where the last run stopped, and starts over after the last (ADR 0007). One it
   leaves for a later run (a Return or its mark refused, an Order still being installed) does not
-  keep those after it from being read. A run that leaves every record it read logs a warning.
+  keep those after it from being read. A run that reads a full page and leaves every record of it
+  logs a warning.
 - Through the record producer, a return is raised only when the Return create rule lets its requester
   in (asset managers, account managers, NOC, the service desk and Customer admins): a Customer admin
   requests only for their own Customer, the others for any Customer, and site contacts never. The Site
