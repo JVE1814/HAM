@@ -161,6 +161,11 @@ function valueOf(gr: ForeignRecord, field: string): string | null {
     return element ? element.getValue() : null
 }
 
+/** Assigned, not setValue, which stores nothing for a journal field; the GlideRecord types do not allow the assignment. */
+export function addWorkNote(record: ForeignRecord, note: string): void {
+    ;(record as unknown as { work_notes: string }).work_notes = note
+}
+
 export function str(gr: ForeignRecord, field: string): string {
     const value = valueOf(gr, field)
     return value === null || value === undefined ? '' : String(value)

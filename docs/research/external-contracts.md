@@ -774,6 +774,7 @@ Sources:
 | ATF *Record Validation* on a date field | The ATF tests check a date with the `ON` form, `endsON2028-01-31@javascript:gs.dateGenerate('2028-01-31','start')@javascript:gs.dateGenerate('2028-01-31','end')` (`src/fluent/leases/tests.now.ts`) | The step matches the record loaded in memory against the condition, not the database, and there a date `=` a literal day is shifted by the session time zone; `ON` matches the day in every time zone | matches | N42 |
 | A row inserted into an import-set table outside an import set | The app processes its import rows by business rule and ships no transform map (ADR 0018); an ATF test that inserts such a row does not fail on server errors and checks the outcome (`src/fluent/models/tests.now.ts`) | The platform transforms the row at once and, where the table has no transform map, logs the error *Transform map record not provided, transform stopped*; the insert is written and the app's rule runs | matches | N43 |
 | `gs.getPropertySecured` and a password2 property's read roles | Every secret is read with `gs.getProperty` (`platform/properties.ts` secretProperty), not `gs.getPropertySecured`; each declares read and write roles `admin`; the tracking webhook reads its token as guest, and *Ship* and *Create return label* read the ShipEngine key as asset managers or inventory techs | Not documented (only the signature in the typings). On an instance `getPropertySecured` checks the property's read roles against the session user and gives a non-admin the default; `getProperty` gives everyone the stored value | matches | N44, N45 |
+| A work note on a task-extended table | A note is added by assigning `work_notes` (`platform/records.ts` addWorkNote) and stored by the next insert or update, even one that changes nothing else | `setValue('work_notes', x)`, `setValue('comments', x)` and `getElement(f).setValue(x)` store nothing, in global and in `x_daas_ham`: the field reads back blank and a save with nothing else changed writes nothing yet returns the sys_id. Assignment stores one journal entry per assignment. `setJournalEntry` and `setDisplayValue` are refused in `x_daas_ham`. A journal field reads blank once read or saved | matches | N46 |
 
 Notes:
 
@@ -1094,6 +1095,16 @@ Sources:
   app's properties are in `x_daas_ham`: *NaaS - the tracking webhook needs its token and records a
   delivery once* posts the delivery unauthenticated with the token, so it shows the scoped read as
   guest ([verify-on-instance.md](../verify-on-instance.md#atf-route-tests)).
+- N46: development instance, 2026-11-12, background scripts in global and in `x_daas_ham` on
+  `x_daas_ham_return_order`, `x_daas_ham_order` and `sn_customerservice_case`, and in `x_daas_ham`
+  through the deployed `records` module. After `setValue('work_notes', x)` (and `comments`, and
+  through `getElement`, with or without `setWorkflow(false)`), `getValue` gave `''`, `update()`
+  returned the sys_id, `sys_mod_count` stayed the same and `sys_journal_field` got no entry, on
+  insert and on update. After `gr.work_notes = x` the update raised `sys_mod_count` by one and
+  `sys_journal_field` got the entry; two assignments before one save gave two entries. The daily job
+  *NaaS - chase overdue returns* closed a Return with no line and stored no note. A fresh `get` read
+  `work_notes` as `''`. The test records and the cross-scope privileges the runs granted were
+  deleted afterwards.
 
 ## Changes needed in the app
 

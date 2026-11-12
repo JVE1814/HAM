@@ -91,7 +91,8 @@ describe('submitting an Order that adds a unit', () => {
 
         expect(submitOrder(order())).toEqual({ submitted: false, message: `Order not submitted yet: ${BUSY} in a minute`, queued: true })
 
-        expect(storedOrder()).toMatchObject({ stage: 'draft', work_notes: `Not submitted yet: ${BUSY}` })
+        expect(storedOrder()).toMatchObject({ stage: 'draft' })
+        expect(platform.notesOn('order1')).toEqual([`Not submitted yet: ${BUSY}`])
         expect(storedOrder().entitlement_verdict ?? '').toBe('')
         expect(queuedRequests()).toEqual([{ name: EVENT.sourceOrder, record: 'order1', delayed: true, request: 'submission', tries: 1 }])
         expect(rows(LOCKS)).toEqual([theirs])
@@ -125,16 +126,14 @@ describe('submitting an Order that adds a unit', () => {
         submitQueuedOrder('order1', 3)
 
         expect(queuedRequests()).toEqual([{ name: EVENT.sourceOrder, record: 'order1', delayed: true, request: 'submission', tries: 4 }])
-        expect(storedOrder().work_notes ?? '').toBe('')
+        expect(platform.notesOn('order1')).toEqual([])
 
         platform.events.length = 0
         submitQueuedOrder('order1', REQUEUE.times)
 
         expect(platform.events).toEqual([])
-        expect(storedOrder()).toMatchObject({
-            stage: 'draft',
-            work_notes: 'Not submitted: other Orders of its Agreement kept being submitted at the same time. Submit it',
-        })
+        expect(storedOrder().stage).toBe('draft')
+        expect(platform.notesOn('order1')).toEqual(['Not submitted: other Orders of its Agreement kept being submitted at the same time. Submit it'])
         expect(platform.warnings).toEqual([expect.stringContaining('ORD0001')])
     })
 

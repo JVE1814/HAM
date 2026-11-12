@@ -51,14 +51,14 @@ describe('a unit whose return lock is held through every try', () => {
         expect(raise()).toEqual({ number: 'RET0002', lines: 0 })
         expect(rows(RETURN_LINES)).toHaveLength(1)
         expect(platform.warnings).toEqual([])
-        expect(rows(RETURNS)[0]?.work_notes).toBe('No equipment to bring back.')
+        expect(platform.notesOn(rows(RETURNS)[0]?.sys_id)).toEqual(['No equipment to bring back.'])
     })
 
     it('is warned about and counted as refused when it awaits no return: its holder never put it on one', () => {
         expect(raise()).toEqual({ number: 'RET0002', lines: 0 })
         expect(rows(RETURN_LINES)).toEqual([])
         expect(platform.warnings).toEqual([expect.stringContaining('a1')])
-        expect(rows(RETURNS)[0]?.work_notes).toBe('No unit could be added (see the system log).')
+        expect(platform.notesOn(rows(RETURNS)[0]?.sys_id)).toEqual(['No unit could be added (see the system log).'])
     })
 })
 
@@ -241,7 +241,8 @@ describe('a Return order left open that no line keeps open', () => {
     it('is closed by the daily job when it has no line, with a work note, and logged', () => {
         chaseOverdue()
 
-        expect(rows(RETURNS)[0]).toMatchObject({ state: CLOSED, work_notes: 'Closed by the daily job: no unit on it is awaited or being evaluated.' })
+        expect(rows(RETURNS)[0]?.state).toBe(CLOSED)
+        expect(platform.notesOn(rows(RETURNS)[0]?.sys_id)).toEqual(['Closed by the daily job: no unit on it is awaited or being evaluated.'])
         expect(platform.logs).toEqual([expect.stringContaining('Return RET0009 closed by the daily job: no line keeps it open')])
         expect(rows(LOCKS)).toEqual([])
     })

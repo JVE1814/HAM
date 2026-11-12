@@ -36,6 +36,12 @@ const TEST_CODE = nowConfig.serverModulesExcludePatterns.map((pattern) => `src/s
 
 const STATIC_IMPORTS = { selector: 'ImportExpression', message: 'A server module imports statically, so the layer rules see it (ADR 0003).' }
 
+/** The platform stores nothing for a journal field given to setValue, and a save with nothing else changed writes nothing. */
+const JOURNAL_SET_VALUE = {
+    selector: "CallExpression[callee.property.name='setValue'][arguments.0.value=/^(work_notes|comments)$/]",
+    message: 'setValue stores no journal entry: add the note with addWorkNote from platform/records.',
+}
+
 export default tseslint.config(
     {
         ignores: [
@@ -70,7 +76,7 @@ export default tseslint.config(
     {
         files: [SERVER_FILES],
         ignores: TEST_CODE,
-        rules: { 'no-restricted-syntax': ['error', STATIC_IMPORTS] },
+        rules: { 'no-restricted-syntax': ['error', STATIC_IMPORTS, JOURNAL_SET_VALUE] },
     },
     // An administrator picks the app's lines out of the system log by the scope that platform/log leads each with.
     {
@@ -91,6 +97,7 @@ export default tseslint.config(
             'no-restricted-syntax': [
                 'error',
                 STATIC_IMPORTS,
+                JOURNAL_SET_VALUE,
                 {
                     selector: "CallExpression[callee.property.name='setWorkflow']",
                     message: 'A write past the business rules gets past the closed Billing period lock: make it in platform/closed-period.',

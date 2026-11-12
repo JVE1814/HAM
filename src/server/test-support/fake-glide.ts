@@ -19,7 +19,9 @@ import { compare, matchesQuery } from './encoded-query.ts'
  *   - `update` saves the fields changed since the record was read, does nothing when none was, and throws for a record
  *     that is not stored: on the platform that inserts one, which no code here means to do;
  *   - a refused insert, update or delete returns what the platform returns (null, false) and leaves the reason in
- *     `getLastErrorMessage`.
+ *     `getLastErrorMessage`;
+ *   - `setValue` of a journal field (work_notes, comments) throws: the platform stores nothing for it. Assigning one
+ *     queues an entry that the next insert or update stores in `platform.journal`, even with no other field changed.
  * A Glide method the fake does not have fails the test with a TypeError: add it here, once, with the platform's
  * behaviour.
  */
@@ -35,6 +37,14 @@ export interface QueuedEvent {
     parm2: string
     /** Queued for later (gs.eventQueueScheduled) rather than now. */
     delayed: boolean
+}
+
+const JOURNAL_FIELDS = new Set(['work_notes', 'comments'])
+interface JournalEntry {
+    table: string
+    record: string
+    field: string
+    value: string
 }
 
 const UNIQUE_KEY_VIOLATION = 'Unique Key violation detected by database'
@@ -71,6 +81,8 @@ function state() {
         }) as (table: string) => boolean,
         /** Called with each row as it is inserted or updated, once nothing refused it and before it is stored. */
         onSave: (() => undefined) as (table: string, row: Row, operation: Exclude<Operation, 'delete'>) => void,
+        /** The journal entries saved (sys_journal_field), oldest first: a journal field reads blank on the record. */
+        journal: [] as JournalEntry[],
         events: [] as QueuedEvent[],
         /** What was logged, as `<level> <message>`. */
         logs: [] as string[],
@@ -90,6 +102,11 @@ export const platform = {
     ...state(),
     reset(): void {
         Object.assign(platform, state())
+    },
+    /** The work notes saved on a record, oldest first. */
+    notesOn(record: string | undefined): string[] {
+        if (!record) throw new Error('fake Glide: notesOn is asked of a record with no sys_id')
+        return platform.journal.filter((entry) => entry.record === record && entry.field === 'work_notes').map((entry) => entry.value)
     },
     get warnings(): string[] {
         return platform.logs.filter((line) => line.startsWith('warn ')).map((line) => line.slice('warn '.length))
@@ -221,9 +238,11 @@ class GlideRecord extends Conditions {
     private read: Row | null = null
     private fresh = false
     private error = ''
+    private notes: Array<{ field: string; value: string }> = []
 
     hold(row: Row, fresh: boolean): this {
         this.row = { ...row }
+        this.notes = []
         this.read = fresh ? null : { ...row }
         this.fresh = fresh
         return this
@@ -305,7 +324,18 @@ class GlideRecord extends Conditions {
         const referenced = target && value ? store(target).find((row) => row.sys_id === value) : undefined
         return referenced ? displayOf(referenced) : value
     }
+    set work_notes(value: string) {
+        this.notes.push({ field: 'work_notes', value: String(value) })
+    }
+    set comments(value: string) {
+        this.notes.push({ field: 'comments', value: String(value) })
+    }
+    private saveNotes(): void {
+        for (const note of this.notes) platform.journal.push({ table: this.table, record: this.getUniqueValue(), ...note })
+        this.notes = []
+    }
     setValue(field: string, value: unknown): void {
+        if (JOURNAL_FIELDS.has(field)) throw new Error(`fake Glide: setValue('${field}') on ${this.table} stores nothing on the platform: assign the journal field`)
         this.row[field] = value === null || value === undefined ? '' : String(value)
     }
     getLastErrorMessage(): string {
@@ -338,6 +368,7 @@ class GlideRecord extends Conditions {
         for (const [field, value] of Object.entries(platform.defaults[this.table]?.(this.row) ?? {})) this.row[field] ||= value
         platform.onSave(this.table, this.row, 'insert')
         store(this.table).push({ ...this.row })
+        this.saveNotes()
         this.hold(this.row, false)
         return this.row.sys_id
     }
@@ -350,7 +381,7 @@ class GlideRecord extends Conditions {
         const read = this.read ?? {}
         const sysId = this.stored().sys_id ?? null
         const changed = Object.keys(this.row).filter((field) => (this.row[field] ?? '') !== (read[field] ?? ''))
-        if (changed.length === 0) return sysId
+        if (changed.length === 0 && this.notes.length === 0) return sysId
         this.error = this.refusal('update', this.stored())
         if (this.error) return null
         this.row.sys_updated_on = stamp(platform.clock)
@@ -358,6 +389,7 @@ class GlideRecord extends Conditions {
         const stored = this.stored()
         for (const field of [...changed, 'sys_updated_on']) stored[field] = this.row[field] ?? ''
         this.read = { ...this.row }
+        this.saveNotes()
         return sysId
     }
     deleteRecord(): boolean {

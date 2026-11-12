@@ -50,7 +50,7 @@ import { clearRackPlacement } from './racks.ts'
 import { attemptLock, withLock } from './locks.ts'
 import { intProperty } from './properties.ts'
 import { PROPERTY } from '../domain/properties.ts'
-import { bool, choice, exists, findById, num, refusal, str, warnRefused } from './records.ts'
+import { addWorkNote, bool, choice, exists, findById, num, refusal, str, warnRefused } from './records.ts'
 import { creatorOf, currentSession } from './session.ts'
 import { moveAlongPath } from './stock.ts'
 import { endSitePackageIfEmpty } from './subscriptions.ts'
@@ -142,7 +142,7 @@ function fillReturn(order: GlideRecord, request: ReturnRequest): RaisedReturn {
         // Nothing installed, everything already on another Return order, or every unit refused: close straight away.
         order.setValue('state', TASK_STATE.closedComplete)
         const note = refused > 0 ? 'No unit could be added (see the system log).' : 'No equipment to bring back.'
-        order.setValue('work_notes', note)
+        addWorkNote(order, note)
     } else if (opensDeinstallWork(request.trigger, request.method)) {
         const context = {
             customerId: request.customerId,
@@ -155,7 +155,7 @@ function fillReturn(order: GlideRecord, request: ReturnRequest): RaisedReturn {
             order.setValue('change_request', work.changeId)
             order.setValue('work_order', work.workOrderId)
         } else {
-            order.setValue('work_notes', 'De-install work not opened (see the system log): open it by hand.')
+            addWorkNote(order, 'De-install work not opened (see the system log): open it by hand.')
         }
     }
     // Its lines and moves are saved, but a Return without its due date is never chased: logged to set it by hand.
@@ -507,7 +507,7 @@ function chaseHolding(): void {
             const step = overdueStep({ dueDate: line.dueDate, today, graceDays: grace, escalated: bool(returnOrder, 'escalated') })
             if (step === 'escalate') {
                 returnOrder.setValue('escalated', true)
-                returnOrder.setValue('work_notes', `Return overdue since ${line.dueDate}; customer and account manager notified.`)
+                addWorkNote(returnOrder, `Return overdue since ${line.dueDate}; customer and account manager notified.`)
                 // Not marked escalated, it would be escalated again every day: nobody is told until the mark holds.
                 if (!returnOrder.update()) return void warnRefused(returnOrder, `${number} not escalated`)
                 const recipients = [...customerAdminIds(str(returnOrder, 'customer')), str(returnOrder, 'agreement.account_manager')]
@@ -616,7 +616,7 @@ function closeReturnIfDone(returnOrderId: string, note = ''): boolean {
     const order = findById(RETURN, returnOrderId)
     if (!order || str(order, 'state') === String(TASK_STATE.closedComplete)) return false
     order.setValue('state', TASK_STATE.closedComplete)
-    if (note) order.setValue('work_notes', note)
+    if (note) addWorkNote(order, note)
     if (order.update()) return true
     // No later line calls this again: the daily job closes it (`closeDoneReturns`), and warns again while it is refused.
     warnRefused(order, `Return ${str(order, 'number')} not closed, close it`)

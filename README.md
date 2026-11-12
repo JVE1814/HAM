@@ -346,7 +346,9 @@ Conventions that the build or tests enforce:
   evaluator (`test-support/encoded-query.ts`), with the refusals, clock, user, queued events and log
   a test sets up. It keeps the platform's behaviour where that is known and throws on what it does
   not know (an operator, a dot-walk through a reference the test did not declare, a Glide method it
-  lacks), so no test passes on a guess. It runs no business rule, ACL or flow: those are ATF's.
+  lacks), so no test passes on a guess. `setValue` of `work_notes` or `comments` throws, as the
+  instance stores nothing for it; a note added with `addWorkNote` is stored by the save, and a test
+  reads it with `platform.notesOn`. It runs no business rule, ACL or flow: those are ATF's.
 - `.now.ts` files are evaluated by the SDK, not run: they hold constants, template literals over
   constants and property access, and imports of constants from `src/server/domain` (and the demo
   depot group's name from `entry/demo-seed.ts`, which seeds it), but no function call, loop, spread

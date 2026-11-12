@@ -114,7 +114,7 @@ describe('Ship, with the tracking number typed on the Order', () => {
                 location: 'site1',
             }),
         ])
-        expect(rows(WORK_ORDERS)[0]?.work_notes ?? '').toBe('')
+        expect(platform.notesOn(rows(WORK_ORDERS)[0]?.sys_id)).toEqual([])
         expect(order()).toMatchObject({ change_request: rows(CHANGES)[0]?.sys_id, work_order: rows(WORK_ORDERS)[0]?.sys_id, tracking_number: 'TYPED-BY-HAND' })
         expect(aggregator.sent).toEqual([])
         expect(rows(SHIPMENTS)).toEqual([])
@@ -145,16 +145,17 @@ describe('Ship, with the tracking number typed on the Order', () => {
     })
 
     it.each([
-        ['device_replace', 'fsm_engineer', { type: 'standard' }, { x_daas_ham_purpose: 'swap' }],
-        ['refresh', 'fsm_engineer', { type: 'normal' }, { x_daas_ham_purpose: 'swap' }],
-        ['device_add', 'subcontractor', { type: 'normal' }, { x_daas_ham_purpose: 'install', work_notes: 'Dispatch to subcontractor / remote hands.' }],
-    ])('opens the work a %s Order installed by %s needs', (orderType, installMode, change, workOrder) => {
+        ['device_replace', 'fsm_engineer', { type: 'standard' }, { x_daas_ham_purpose: 'swap' }, []],
+        ['refresh', 'fsm_engineer', { type: 'normal' }, { x_daas_ham_purpose: 'swap' }, []],
+        ['device_add', 'subcontractor', { type: 'normal' }, { x_daas_ham_purpose: 'install' }, ['Dispatch to subcontractor / remote hands.']],
+    ])('opens the work a %s Order installed by %s needs', (orderType, installMode, change, workOrder, notes) => {
         Object.assign(order(), { order_type: orderType, install_mode: installMode })
 
         shipOrder('o1')
 
         expect(rows(CHANGES)).toEqual([expect.objectContaining(change)])
         expect(rows(WORK_ORDERS)).toEqual([expect.objectContaining(workOrder)])
+        expect(platform.notesOn(rows(WORK_ORDERS)[0]?.sys_id)).toEqual(notes)
     })
 
     it('opens no on-site work for a self-install', () => {
@@ -281,7 +282,8 @@ describe('a Ship that sends part of the Order', () => {
 
         expect(shipOrder('o1')).toEqual({ problems: [], shipped: { units: 2, siteName: 'Acme HQ' } })
 
-        expect(rows(WORK_ORDERS)).toEqual([expect.objectContaining({ work_notes: 'Dispatch to subcontractor / remote hands.' })])
+        expect(rows(WORK_ORDERS)).toHaveLength(1)
+        expect(platform.notesOn(rows(WORK_ORDERS)[0]?.sys_id)).toEqual(['Dispatch to subcontractor / remote hands.'])
     })
 })
 

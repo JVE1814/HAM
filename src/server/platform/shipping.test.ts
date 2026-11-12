@@ -110,7 +110,7 @@ describe('a tracking update for a stored Shipment', () => {
             ['shp1', '2026-11-10T08:00:00Z', 'in_transit', 'Picked up', 'Oslo, NO'],
             ['shp1', '2026-11-10T14:00:00Z', 'in_transit', 'Arrived at hub', 'Bergen, NO'],
         ])
-        expect(order().work_notes ?? '').toBe('')
+        expect(platform.notesOn(order().sys_id)).toEqual([])
         expect(rows(LOCKS)).toEqual([])
         expect(platform.logs).toEqual([])
     })
@@ -177,18 +177,16 @@ describe('a delivery', () => {
         expect(trackShipment(DELIVERED)).toEqual({ outcome: 'applied', status: 'delivered' })
 
         expect(shipment()).toMatchObject({ status: 'delivered', status_detail: 'Delivered', delivered_at: '2026-11-11 10:15:00' })
-        expect(order().work_notes).toBe('Delivered to Acme HQ (ups 1Z999).')
+        expect(platform.notesOn(order().sys_id)).toEqual(['Delivered to Acme HQ (ups 1Z999).'])
         expect(storedEvents()).toHaveLength(4)
     })
 
     it('is noted once, however often the update is sent', () => {
         trackShipment(DELIVERED)
-        // A journal field reads blank once its entry is saved.
-        order().work_notes = ''
 
         expect(trackShipment(DELIVERED)).toEqual({ outcome: 'applied', status: 'delivered' })
 
-        expect(order().work_notes).toBe('')
+        expect(platform.notesOn(order().sys_id)).toEqual(['Delivered to Acme HQ (ups 1Z999).'])
         expect(shipment().delivered_at).toBe('2026-11-11 10:15:00')
         expect(storedEvents()).toHaveLength(4)
     })
@@ -231,7 +229,7 @@ describe('a delivery', () => {
         expect(trackShipment(DELIVERED)).toEqual({ outcome: 'applied', status: 'delivered' })
 
         expect(shipment().status).toBe('delivered')
-        expect(order().work_notes ?? '').toBe('')
+        expect(platform.notesOn(order().sys_id)).toEqual([])
         expect(platform.warnings).toEqual([expect.stringContaining('ORD0001 not noted as delivered (ups 1Z999): order is read only')])
     })
 
@@ -240,7 +238,7 @@ describe('a delivery', () => {
 
         expect(trackShipment(DELIVERED)).toEqual({ outcome: 'applied', status: 'delivered' })
 
-        expect(order().work_notes ?? '').toBe('')
+        expect(platform.notesOn(order().sys_id)).toEqual([])
     })
 })
 
@@ -375,7 +373,8 @@ describe('marking an outbound label voided', () => {
         })
 
         expect(shipment()).toMatchObject({ status: 'voided', status_detail: 'Voided with the carrier (marked by Ada)' })
-        expect(order()).toMatchObject({ tracking_number: '', carrier: '', work_notes: NOTE })
+        expect(order()).toMatchObject({ tracking_number: '', carrier: '' })
+        expect(platform.notesOn(order().sys_id)).toEqual([NOTE])
         expect(rows(LOCKS)).toEqual([])
         expect(platform.logs).toEqual([])
     })
@@ -395,7 +394,7 @@ describe('marking an outbound label voided', () => {
 
         expect(shipment().status).toBe('voided')
         expect(order()).toMatchObject({ tracking_number: '1Z777', carrier: 'ups' })
-        expect(order().work_notes ?? '').toBe('')
+        expect(platform.notesOn(order().sys_id)).toEqual([])
     })
 
     it("changes nothing while a Ship of its Order holds the Order's Ship lock", () => {
@@ -503,7 +502,7 @@ describe('a Return order and its prepaid label', () => {
             currency: 'NOK',
             status: 'label_created',
         })
-        expect(returnOrder().work_notes).toBe('Return label 1ZRET01 (ups): https://labels.example/se-123.pdf')
+        expect(platform.notesOn(returnOrder().sys_id)).toEqual(['Return label 1ZRET01 (ups): https://labels.example/se-123.pdf'])
         expect(rows(LOCKS)).toEqual([])
         expect(platform.logs).toEqual([])
     })
@@ -570,7 +569,7 @@ describe('a Return order and its prepaid label', () => {
         expect(requestLabel()).toEqual({ bought: false, why: 'No label: HTTP 400: carrier account suspended' })
 
         expect(rows(SHIPMENTS)).toHaveLength(1)
-        expect(returnOrder().work_notes ?? '').toBe('')
+        expect(platform.notesOn(returnOrder().sys_id)).toEqual([])
     })
 
     it('names the label bought, to be voided, when the platform refuses its Shipment', () => {
@@ -620,7 +619,7 @@ describe('a Return order and its prepaid label', () => {
             expect(voidLabel('shp2', '1ZOLD')).toEqual({ voided: true, message: 'Label 1ZOLD marked voided', leftUndone: false })
 
             expect(shipment('shp2')).toMatchObject({ status: 'voided', status_detail: 'Voided with the carrier (marked by Ada)' })
-            expect(returnOrder().work_notes).toBe('Return label 1ZOLD voided with the carrier: do not ship on it.')
+            expect(platform.notesOn(returnOrder().sys_id)).toEqual(['Return label 1ZOLD voided with the carrier: do not ship on it.'])
             expect(order()).toMatchObject({ tracking_number: '1Z999', carrier: 'ups' })
             expect(requestLabel()).toEqual({ bought: true, trackingNumber: '1ZRET01' })
         })

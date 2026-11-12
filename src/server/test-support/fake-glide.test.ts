@@ -181,6 +181,36 @@ describe('saving', () => {
         expect(saves).toEqual([`update ${LINES} l1`, `update ${LINES} l1`])
     })
 
+    it('stores an assigned journal entry with the save, even when nothing else changed, and fails the test on setValue of one', () => {
+        const order = find(ORDERS, 'o1')
+        expect(() => order.setValue('work_notes', 'lost')).toThrow("setValue('work_notes')")
+        expect(() => order.setValue('comments', 'lost')).toThrow("setValue('comments')")
+        order.work_notes = 'first'
+        order.work_notes = 'second'
+        order.comments = 'to the customer'
+        expect(platform.notesOn('o1')).toEqual([])
+        expect(order.update()).toBe('o1')
+        expect(platform.notesOn('o1')).toEqual(['first', 'second'])
+        expect(platform.journal).toContainEqual({ table: ORDERS, record: 'o1', field: 'comments', value: 'to the customer' })
+        expect(order.getValue('work_notes')).toBeNull()
+        expect(platform.tables[ORDERS][0].sys_updated_on).toBe('2025-11-09 12:00:00')
+
+        const fresh = new GlideRecord(ORDERS)
+        fresh.initialize()
+        fresh.setValue('customer', 'acme')
+        fresh.work_notes = 'raised'
+        expect(platform.notesOn(fresh.insert() ?? undefined)).toEqual(['raised'])
+        expect(() => platform.notesOn('')).toThrow('no sys_id')
+    })
+
+    it('stores no journal entry from a refused save', () => {
+        platform.refuses = () => 'read only'
+        const order = find(ORDERS, 'o2')
+        order.work_notes = 'refused'
+        expect(order.update()).toBeNull()
+        expect(platform.notesOn('o2')).toEqual([])
+    })
+
     it('refuses what the test, a unique index or a table rule refuses, with why', () => {
         platform.uniqueKeys[ORDERS] = 'number'
         platform.constraints[ORDERS] = (row) => (row.customer ? '' : 'Customer is mandatory')

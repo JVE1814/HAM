@@ -6,7 +6,7 @@ import { isFleetAsset, readStage } from './assets.ts'
 import { withLock } from './locks.ts'
 import { log } from './log.ts'
 import { createOrder, submitOrder } from './orders.ts'
-import { bool, findById, refusal, str, warnRefused, type ForeignRecord } from './records.ts'
+import { addWorkNote, bool, findById, refusal, str, warnRefused, type ForeignRecord } from './records.ts'
 
 /**
  * Break-fix replacements (P2.3, Q58): the device-replace Order a CSM case raises for its failed Asset. It tells the
@@ -140,6 +140,6 @@ export function noteReplacementComplete(orderId: string): void {
     const kase = findById('sn_customerservice_case', caseId)
     if (!kase) return void log.warn(`${str(order, 'number')} complete, but its case ${caseId} was not found: save the case to stop its SLA`)
     if (!bool(kase, 'active') || str(kase, 'x_daas_ham_replacement_order') !== order.getUniqueValue()) return
-    kase.setValue('work_notes', `Replacement order ${str(order, 'number')} is complete: the replacement is installed.`)
+    addWorkNote(kase, `Replacement order ${str(order, 'number')} is complete: the replacement is installed.`)
     if (!kase.update()) warnRefused(kase, `${str(kase, 'number')}: replacement SLA not stopped, the case save was refused; save the case`)
 }

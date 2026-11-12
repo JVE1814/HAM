@@ -21,7 +21,7 @@ import { beyondVisibility } from './beyond-visibility.ts'
 import { lineLostUnit } from './fulfilment.ts'
 import { log } from './log.ts'
 import { lineOpenness } from './order-lines.ts'
-import { bool, deleteWhere, exists, findById, num, refusal, str, warnRefused } from './records.ts'
+import { addWorkNote, bool, deleteWhere, exists, findById, num, refusal, str, warnRefused } from './records.ts'
 import { leaveOrderLine } from './stock.ts'
 
 function activeTemplates(): StagingTemplateView[] {
@@ -205,7 +205,7 @@ export function skipOpenStagingTasks(assetId: string, why: string): boolean {
     let closed = true
     while (task.next()) {
         task.setValue('state', STAGING_TASK_STATE.skipped)
-        task.setValue('work_notes', `${why}; staging skipped.`)
+        addWorkNote(task, `${why}; staging skipped.`)
         if (task.update()) continue
         // Left open, it asks a technician to stage a unit that is back in stock.
         warnRefused(task, `${why.toLowerCase()}: ${str(task, 'number')} left open, close it`)
