@@ -204,6 +204,10 @@ differently: `preflight` holds the preflight check's result, `billing_generate_<
 billing pass (ADR 0007), `provider_tag_sequence` the Provider tag counter, and `oem_claim_stranded`
 only where the OEM claim run's check for stranded steps goes on from, with no status.
 
+A generator for a dev instance and a timing protocol are drafted in
+[research/scale-test.md](research/scale-test.md), with the prototype in `tools/scale/`. Neither has
+run on an instance, and no threshold is agreed yet.
+
 ## Fleet (ADR 0016)
 
 ### Fleet column
