@@ -142,7 +142,7 @@ checked by reading only. Each executor still runs its own gate.
 | [028](028-attestation-sites-by-aggregate.md) | Find an Agreement's Sites for attestation with one grouped count | P2 | S | none | DONE |
 | [029](029-raise-replacement-lock.md) | Raise a case's replacement under a job lock, so two presses raise one Order | P2 | S | none | DONE (instance check pending) |
 | [030](030-shipping-characterization.md) | Test tracking updates, label voids and label purchases on the fake Glide | P2 | M | none | DONE |
-| [031](031-ship-order-tests.md) | Test Ship and install confirmation on the fake Glide | P2 | M | none | TODO |
+| [031](031-ship-order-tests.md) | Test Ship and install confirmation on the fake Glide | P2 | M | none | DONE |
 | [032](032-customer-direct-insert-checks.md) | Check an Order or Return order a Customer contact inserts, whatever inserts it | P2 | M | step 1 instance check | TODO |
 | [033](033-typecheck-client-tests.md) | Make `npm run typecheck` check the client tests the way the build does | P3 | S | none | TODO |
 | [034](034-adr-react-workspace.md) | Record in an ADR that the workspace is a React page, not a Fluent Workspace | P3 | S | none | DONE (Owner-to-fill paragraph in ADR 0019 awaits the owner) |
