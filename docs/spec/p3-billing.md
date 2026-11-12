@@ -149,9 +149,10 @@ fees).
   against cost in another: a Customer and Site with amounts in two currencies get one Margin row per
   currency (a label the carrier charged in USD, for a Customer invoiced in EUR, shows as a USD row
   with cost only).
-- A Service interval whose Asset is gone, or whose currency is not known, a work order whose currency
-  is not known, and a shipment with a cost but no currency are left out of Cost facts and Margin and
-  counted on the period with the others (*Records that failed to cost*, below).
+- A Service interval whose Asset is gone, whose currency is not known or that names no Customer, a
+  work order whose currency is not known or that has no Customer, and a shipment with a cost but no
+  currency or no Customer are left out of Cost facts and Margin and counted on the period with the
+  others (*Records that failed to cost*, below).
 - Amounts are rounded to the cent half away from zero. Each chunk of Service intervals adds its sums
   to the Cost facts rounded to the cent, so a Cost fact may differ by a fraction of a cent from
   rounding the month's total once. Margin sums the Cost facts and billing lines per Customer, Site

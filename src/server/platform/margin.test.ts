@@ -119,3 +119,23 @@ describe('the margin of a closed Billing period', () => {
         expect(rows(MARGIN)).toEqual([])
     })
 })
+
+describe('a cost that names no Customer', () => {
+    it("is counted on the period when it is a Service interval's, not left out without a word", () => {
+        platform.tables[INTERVAL] = [interval('i1', 'a1'), interval('i2', 'a2', { customer: '' })]
+
+        computeMargin()
+
+        expect(facts()).toEqual([['acme', 's1', 'purchase', 'EUR', '100']])
+        expect(periodRow()).toMatchObject({ margin_failed: '1', margin_error: 'i2: it names no Customer to cost it to' })
+    })
+
+    it("is counted on the period when it is a work order's", () => {
+        platform.tables[WORK_ORDER] = [workOrder('wo1', { company: '', initiated_from: 'ord1' })]
+
+        computeMargin()
+
+        expect(facts()).toEqual([['acme', 's1', 'purchase', 'EUR', '200']])
+        expect(periodRow()).toMatchObject({ margin_failed: '1', margin_error: 'work order WO1: it has no Customer to cost it to' })
+    })
+})
