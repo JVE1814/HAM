@@ -33,7 +33,7 @@ trigger with nothing to read and nothing to word is wired to the platform functi
   service that returns what came of it and tells the user nothing itself, so a form button, a job
   and a REST route can all run it.
 - Fluent imports a function from `entry/` or `platform/` only to wire it to a record. It imports
-  constants from `domain/` and `platform/` as before.
+  constants from `domain/`.
 - The SDK's generated wrapper passes a wired function its arguments by name, wherever the function
   lives. So its parameters are named after the platform's globals for its trigger: `current` and
   `previous` (business rule), `event` and `current` (script action), `producer` and `current`

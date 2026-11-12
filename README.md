@@ -322,11 +322,11 @@ Conventions that the build or tests enforce:
   not know (an operator, a dot-walk through a reference the test did not declare, a Glide method it
   lacks), so no test passes on a guess. It runs no business rule, ACL or flow: those are ATF's.
 - `.now.ts` files are evaluated by the SDK, not run: they hold constants, template literals over
-  constants and property access, and imports of constants (from `src/server/domain` and
-  `src/server/platform` too), but no function call, loop, spread or array element. A value the SDK
-  cannot read is no build error: the record is built with `Symbol(...)` or `[object Object]` in it,
-  which `built-metadata.test.ts` finds in the built output (so it needs `npx now-sdk build` first;
-  `npm run check` builds before it tests).
+  constants and property access, and imports of constants from `src/server/domain` (and the demo
+  depot group's name from `entry/demo-seed.ts`, which seeds it), but no function call, loop, spread
+  or array element. A value the SDK cannot read is no build error: the record is built with
+  `Symbol(...)` or `[object Object]` in it, which `built-metadata.test.ts` finds in the built output
+  (so it needs `npx now-sdk build` first; `npm run check` builds before it tests).
 - What a query, qualifier or condition tells NaaS records by (the Fleet flag, a NaaS stockroom type,
   an OEM PID, a customer Site) is a constant of `domain/fleet.ts`, which the Fluent metadata imports.
 - A function wired from Fluent, in `entry/` or `platform/`, names its parameters after the platform

@@ -57,8 +57,8 @@ import { PROPERTY, type PropertyOf } from './domain/properties'
 import type { ForeignRecord } from './platform/records'
 import { restMessagePort } from './platform/rest-messages'
 
-// The registries the metadata imports from platform modules are plain constants; Glide itself is not needed to read
-// them. A property reads as its declared value.
+// The wired entry and platform functions this test type-checks, and the REST message port it calls, import Glide. A
+// property reads as its declared value.
 vi.mock('@servicenow/glide', () => ({
     gs: { getProperty: (_name: string, fallback = '') => fallback, warn: () => undefined },
     GlideRecord: class {},
