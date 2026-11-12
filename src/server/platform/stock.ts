@@ -3,7 +3,6 @@ import { messageOf } from '../domain/errors.ts'
 import { LOCK_TRIES, type HeldLock } from '../domain/job-lock.ts'
 import { pathTo, type Stage } from '../domain/lifecycle.ts'
 import { LOCK } from '../domain/lock-names.ts'
-import { candidateLimit, stockQueries, type SourcingScope } from '../domain/sourcing.ts'
 import {
     CANDIDATE_ORDER,
     freeStockQuery,
@@ -12,7 +11,6 @@ import {
     reservationValues,
     type LineExit,
     type Reservation,
-    type StockCandidate,
     type StockUnit,
 } from '../domain/stock.ts'
 import { moveAndSave, moveAsset, readStage } from './assets.ts'
@@ -23,21 +21,6 @@ import { refusal, str, warnRefused } from './records.ts'
 import { STOCK_STAGES } from '../domain/lifecycle.ts'
 import { log } from './log.ts'
 
-/**
- * Stock on no Order line that may serve `scope` for a `shortfall`, each unit under the Source whose query found it
- * (domain/sourcing `stockQueries`): a bounded number per Source (`candidateLimit`). A hot spare linked to a line stays
- * in the pool but is taken.
- */
-export function stockCandidates(scope: SourcingScope, shortfall: number): StockCandidate[] {
-    const limit = candidateLimit(shortfall)
-    const candidates: StockCandidate[] = []
-    for (const { source, query } of stockQueries(scope)) {
-        const asset = inCandidateOrder(query, limit)
-        while (asset.next()) candidates.push({ assetId: asset.getUniqueValue(), stockroomId: str(asset, 'stockroom'), source })
-    }
-    return candidates
-}
-
 /** The first `count` units of the Provider's free stock of `modelId` (domain/stock `freeStockQuery`), as the top-up takes them. */
 export function freeStock(modelId: string, count: number): string[] {
     const asset = inCandidateOrder(freeStockQuery(modelId), count)
@@ -46,7 +29,7 @@ export function freeStock(modelId: string, count: number): string[] {
     return ids
 }
 
-function inCandidateOrder(query: string, limit: number): GlideRecord {
+export function inCandidateOrder(query: string, limit: number): GlideRecord {
     const asset = new GlideRecord('alm_hardware')
     asset.addEncodedQuery(query)
     for (const field of CANDIDATE_ORDER) asset.orderBy(field)

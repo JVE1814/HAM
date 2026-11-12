@@ -5,6 +5,7 @@ import { LOCK } from '../domain/lock-names.ts'
 import { lineStillOpen } from '../domain/fulfilment.ts'
 import { advanceReplacementRma } from '../domain/oem-rma.ts'
 import {
+    candidateLimit,
     lineShortfall,
     LINES_TO_SOURCE,
     needsTransfer,
@@ -13,11 +14,12 @@ import {
     shortfallRouteFor,
     sourcingPurpose,
     stillToBuy,
+    stockQueries,
     type ShortfallRoute,
     type SourcingRequest,
     type UnmovedStock,
 } from '../domain/sourcing.ts'
-import { putBackUnit, type Source } from '../domain/stock.ts'
+import { putBackUnit, type Source, type StockCandidate } from '../domain/stock.ts'
 import type { OrderType } from '../domain/vocabulary.ts'
 import { todayIso } from './clock.ts'
 import { lineLostUnit, recomputeLine, recomputeOrder, unitsOnLine } from './fulfilment.ts'
@@ -28,7 +30,7 @@ import { requestPurchase } from './procurement.ts'
 import { stagingStockroom } from './properties.ts'
 import { findById, num, str, warnRefused, type ForeignRecord } from './records.ts'
 import { openStagingTask, skipOpenStagingTasks, startStaging } from './staging-tasks.ts'
-import { leaveOrderLine, linkHotSpare, reserveAsset, stockCandidates } from './stock.ts'
+import { inCandidateOrder, leaveOrderLine, linkHotSpare, reserveAsset } from './stock.ts'
 import { queuePassAgain } from './sourcing-requests.ts'
 import { requestTransfer } from './transfers.ts'
 import { log } from './log.ts'
@@ -109,7 +111,7 @@ function sourceLine(orderLock: HeldLock, order: GlideRecord, line: GlideRecord):
     const customerId = str(order, 'customer')
     const purpose = sourcingPurpose(str(order, 'order_type') as OrderType | '')
     const request: SourcingRequest = { modelId, quantity: shortfall, customerId, siteId: str(order, 'site'), purpose }
-    const plan = planSourcing(request, stockCandidates(request, shortfall))
+    const plan = planSourcing(request, stockCandidates(request))
 
     const stagingId = stagingStockroom()
     const reservation = { orderLineId: lineId, customerId, agreementId: str(order, 'agreement') }
@@ -186,6 +188,21 @@ function shortfallOf(line: GlideRecord, allocated: number): number {
         onOrder: num(line, 'quantity_to_purchase'),
         awaitedRmas: openRmaCount(line.getUniqueValue()),
     })
+}
+
+/**
+ * Stock on no Order line that may serve `request`, each unit under the Source whose query found it
+ * (domain/sourcing `stockQueries`): a bounded number per Source (`candidateLimit`). A hot spare linked to a line stays
+ * in the pool but is taken.
+ */
+function stockCandidates(request: SourcingRequest): StockCandidate[] {
+    const limit = candidateLimit(request.quantity)
+    const candidates: StockCandidate[] = []
+    for (const { source, query } of stockQueries(request)) {
+        const asset = inCandidateOrder(query, limit)
+        while (asset.next()) candidates.push({ assetId: asset.getUniqueValue(), stockroomId: str(asset, 'stockroom'), source })
+    }
+    return candidates
 }
 
 /**
