@@ -20,6 +20,8 @@ function instance({ provider = 'Demo NaaS Provider', refuse = () => false } = {}
         cmdb_hardware_product_model: ['C9300-48P-E', 'MR46-HW', 'FG-60F'].map((pid) => ({ sys_id: `model-${pid}`, x_daas_ham_oem_pid: pid })),
     }
     const logs = []
+    const named = []
+    const stages = []
     let ids = 0
     const rowsOf = (table) => (tables[table] ??= [])
     const valueOf = (row, field) => {
@@ -39,6 +41,7 @@ function instance({ provider = 'Demo NaaS Provider', refuse = () => false } = {}
             this.row = {}
         }
         addQuery(field, operator, value) {
+            named.push({ table: this.table, field })
             this.conditions.push(value === undefined ? [field, '=', operator] : [field, operator, value])
         }
         setLimit(limit) {
@@ -62,6 +65,7 @@ function instance({ provider = 'Demo NaaS Provider', refuse = () => false } = {}
         }
         get(field, value) {
             const [name, wanted] = value === undefined ? ['sys_id', field] : [field, value]
+            named.push({ table: this.table, field: name })
             const row = rowsOf(this.table).find((found) => String(found[name] ?? '') === String(wanted))
             this.row = row ?? {}
             return Boolean(row)
@@ -70,6 +74,7 @@ function instance({ provider = 'Demo NaaS Provider', refuse = () => false } = {}
             this.row = {}
         }
         setValue(field, value) {
+            named.push({ table: this.table, field, value })
             this.row[field] = value
         }
         getValue(field) {
@@ -110,7 +115,7 @@ function instance({ provider = 'Demo NaaS Provider', refuse = () => false } = {}
             const asset = new GlideRecord('alm_hardware')
             asset.initialize()
             asset.setValue('model', model)
-            asset.setValue('stage', stage)
+            stages.push(stage)
             asset.setValue('x_daas_ham_fleet', true)
             return asset
         },
@@ -120,7 +125,7 @@ function instance({ provider = 'Demo NaaS Provider', refuse = () => false } = {}
         return logs[logs.length - 1]
     }
     const count = (table) => rowsOf(table).length
-    return { run, count, rowsOf }
+    return { run, count, rowsOf, named, stages }
 }
 
 const SHAPE = { customers: 2, sitesPerCustomer: 3, assetsPerSite: 5, maxAssetsPerRun: 2000, budgetSeconds: 120, assetsModule: 'assets' }
@@ -132,6 +137,14 @@ const GENERATED = {
     alm_hardware: 30,
     x_daas_ham_service_interval: 30,
 }
+/** Every field the two scripts name on a table, with the value they set, and every stage they hand to newAsset. */
+export function scaleScriptNames() {
+    const dev = instance()
+    dev.run(GENERATE, { ...SHAPE, confirm: INSTANCE })
+    dev.run(CLEANUP, { confirm: INSTANCE, maxRowsPerRun: 5000, budgetSeconds: 120 })
+    return { named: dev.named, stages: dev.stages }
+}
+
 const counts = (dev) => Object.fromEntries(Object.keys(GENERATED).map((table) => [table, dev.count(table)]))
 const NOTHING = Object.fromEntries(Object.keys(GENERATED).map((table) => [table, 0]))
 

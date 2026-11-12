@@ -606,6 +606,36 @@ describe('fields the forms, lists and record producers name', () => {
             .map(({ where, table, field }) => `${where}: ${table}.${field}`)
         expect(missing).toEqual([])
     })
+
+    /*
+     * The scale scripts (tools/scale) are pasted into Scripts - Background and are no part of the build. They name
+     * their fields as texts too. The dry run records each one, with the value set, while it runs both scripts.
+     */
+    it('are columns and choices in the scale scripts too, which the dry run runs', async () => {
+        const { scaleScriptNames } = await import('../../tools/scale/dry-run.mjs')
+        const { named, stages } = scaleScriptNames()
+        const choicesOf = (table: string, column: string): string[] | undefined => {
+            const path = join(BUILT, 'dictionary', `${table}.xml`)
+            if (!existsSync(path)) return undefined
+            const choices = new RegExp(`<element name="${column}" [^>]*>\\s*<choice>([\\s\\S]*?)</choice>`).exec(readFileSync(path, 'utf8'))?.[1]
+            return choices === undefined ? undefined : [...choices.matchAll(/<element value="([^"]*)"/g)].map(([, value = '']) => value)
+        }
+        /** The platform tables the scripts name that the SDK ships no definition of: what each extends, and its own columns named. */
+        const UNDEFINED: Readonly<Record<string, { parent: string; columns: readonly string[] }>> = {
+            customer_account: { parent: 'core_company', columns: ['number'] },
+            cmdb_hardware_product_model: { parent: 'cmdb_model', columns: [] },
+        }
+        const known = (table: string, column: string) =>
+            hasColumn(table, column) || Boolean(UNDEFINED[table]?.columns.includes(column) || hasColumn(UNDEFINED[table]?.parent ?? '', column))
+        const fields = [...new Set(named.map(({ table, field }) => `${table}.${field}`))]
+        expect(fields.length).toBeGreaterThan(40)
+        expect(fields.filter((name) => !known(name.split('.')[0] ?? '', name.split('.')[1] ?? ''))).toEqual([])
+        const set = named.filter(({ table, field, value }) => value !== undefined && choicesOf(table, field) !== undefined)
+        expect(new Set(set.map(({ table, field }) => `${table}.${field}`)).size).toBeGreaterThanOrEqual(6)
+        expect(set.filter(({ table, field, value }) => !choicesOf(table, field)?.includes(String(value))).map(({ table, field, value }) => `${table}.${field} = ${value}`)).toEqual([])
+        expect(stages.length).toBeGreaterThan(0)
+        expect(stages.filter((stage) => !(stage in STAGE_FIELDS))).toEqual([])
+    })
 })
 
 /*
