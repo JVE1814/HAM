@@ -96,6 +96,12 @@ describe('stockQueries', () => {
         expect(sourcesOf(forAcme, unit('available', { [STOCKROOM_TYPE]: 'staging_centre' }))).toEqual(['central_stock'])
     })
 
+    it('takes only central stock for an Order with no Customer, whose blank would match every unowned spare', () => {
+        const noCustomer: SourcingScope = { ...replacement, customerId: '' }
+        expect(sources(noCustomer)).toEqual(['central_stock'])
+        expect(sourcesOf(noCustomer, { ...acmeSpare, company: '' })).toEqual([])
+    })
+
     it("finds no other Customer's spares, no unit of another Model or on an Order line, and no unit in another stage", () => {
         expect(sourcesOf(forAcme, { ...acmeSpare, company: 'globex' })).toEqual([])
         for (const stock of [free, acmeSpare, atHq]) {

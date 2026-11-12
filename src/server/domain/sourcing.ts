@@ -96,7 +96,9 @@ export type SourcingScope = Omit<SourcingRequest, 'quantity'>
  * Encoded alm_hardware queries for the stock that may serve `scope`, one per Source in priority order, so a limit on each cuts within its Source only and other Customers' spares never crowd it out.
  */
 export function stockQueries(scope: SourcingScope): Array<{ source: Source; query: string }> {
-    return PRIORITY[scope.purpose].map((source) => ({ source, query: sourceQuery(source, scope) }))
+    // A blank Customer would match every spare and site stock with no owner: an Order without one takes central stock.
+    const sources: readonly Source[] = scope.customerId ? PRIORITY[scope.purpose] : ['central_stock']
+    return sources.map((source) => ({ source, query: sourceQuery(source, scope) }))
 }
 
 const LABEL: Record<Source, string> = {
