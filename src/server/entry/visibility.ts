@@ -14,9 +14,7 @@ import {
 import { readsBeyondVisibility } from '../platform/beyond-visibility.ts'
 import { str, type ForeignRecord } from '../platform/records.ts'
 import { currentSession } from '../platform/session.ts'
-import { hardwareRow, otherAssetClass, placementOf, rowOf, warnUnplaced } from '../platform/visibility.ts'
-
-const HARDWARE = SCOPED_TABLES.alm_hardware
+import { hardwareRow, otherAssetClass, placementOf, rowOf, scopingOfTable } from '../platform/visibility.ts'
 
 /**
  * The before-query business rules' script (shared/visibility.now.ts): restricts a list or look-up to what the user
@@ -30,9 +28,7 @@ const HARDWARE = SCOPED_TABLES.alm_hardware
  */
 export function scopeRecords(current: ForeignRecord): void {
     if (readsBeyondVisibility(current)) return
-    const table = current.getTableName()
-    const { scoping } = placementOf(table)
-    if (!scoping) warnUnplaced(table)
+    const scoping = scopingOfTable(current.getTableName())
     const session = currentSession()
     const filter = visibilityFilter(session.scope, scoping, session)
     if (filter) current.addEncodedQuery(filter)
@@ -52,9 +48,10 @@ export function scopeRecords(current: ForeignRecord): void {
 export function readsRecord(current: GlideRecord): boolean {
     const session = currentSession()
     const table = current.getTableName()
-    const { scoping, asset } = placementOf(table)
-    if (asset) return otherAssetClass(current) || rowVisible(session.scope, HARDWARE, hardwareRow(current), session)
-    if (!scoping) warnUnplaced(table)
+    if (placementOf(table).asset) {
+        return otherAssetClass(current) || rowVisible(session.scope, SCOPED_TABLES.alm_hardware, hardwareRow(current), session)
+    }
+    const scoping = scopingOfTable(table)
     return rowVisible(session.scope, scoping, rowOf(current, scoping), session)
 }
 
@@ -65,7 +62,7 @@ export function readsRecord(current: GlideRecord): boolean {
 export function grantsFleetAsset(current: GlideRecord): boolean {
     if (otherAssetClass(current)) return false
     const session = currentSession()
-    return grantsNaasRecord(session.scope, HARDWARE, hardwareRow(current), session)
+    return grantsNaasRecord(session.scope, SCOPED_TABLES.alm_hardware, hardwareRow(current), session)
 }
 
 /*
@@ -112,9 +109,7 @@ export function readsAssetCost(current: GlideRecord): boolean {
  */
 export function grantsCustomerRecord(current: GlideRecord): boolean {
     const session = currentSession()
-    const table = current.getTableName()
-    const { scoping } = placementOf(table)
-    if (!scoping) warnUnplaced(table)
+    const scoping = scopingOfTable(current.getTableName())
     return grantsContactRecord(session.contactScope(), scoping, rowOf(current, scoping), session)
 }
 

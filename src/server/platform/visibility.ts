@@ -56,10 +56,20 @@ export const placementOf = memoized((table: string): Placement => {
     return { scoping: scopingOf(tables), asset: tables.includes(ASSET_TABLE) }
 })
 
-export const warnUnplaced = memoized((table: string) => {
+const warnUnplaced = memoized((table: string) => {
     gs.warn(`NaaS visibility: ${table} is no scoped table and extends none, so it shows a reader the rules narrow nothing`)
     return true
 })
+
+/**
+ * The scoping of `table` or of the table it extends. A table with none shows a reader the rules narrow no record, so
+ * it is logged, once per table and transaction.
+ */
+export function scopingOfTable(table: string): TableScoping | null {
+    const { scoping } = placementOf(table)
+    if (!scoping) warnUnplaced(table)
+    return scoping
+}
 
 function scopedRow(current: GlideRecord, holder?: () => GlideRecord | null): ScopedRow {
     let loaded: GlideRecord | null | undefined
