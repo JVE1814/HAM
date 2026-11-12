@@ -356,6 +356,16 @@ deletes one. A consumable's cost is still writable as before. Impersonating a Cu
 also holds `sn_customerservice.customer`, `GET /api/now/table/alm_hardware/<their fleet asset>`
 returns no cost, support cost, claim code or lease, and a Shipment returns no cost.
 
+### Work order labour cost
+
+`margin/margin.now.ts`. Impersonating a field-tech-only user, a work order with a *NaaS purpose*
+saves as before (state, work notes), and `PATCH /api/now/table/wm_order/<id>` with
+`{"x_daas_ham_labour_cost":"180"}` does not change its *NaaS field labour cost*. An asset manager
+or a finance user changes it the same way. A user with no NaaS role who reads the work order (a
+dispatcher of the Provider IT) gets no `x_daas_ham_labour_cost` from `GET
+/api/now/table/wm_order/<id>?sysparm_fields=number,x_daas_ham_labour_cost`. Closing the month's
+billing period afterwards still writes the *Field labour* Cost fact from the cost entered.
+
 ### Customer creates
 
 `orders/access.now.ts`, `returns/access.now.ts`. As a customer admin, `POST /api/now/table/x_daas_ham_order` for another

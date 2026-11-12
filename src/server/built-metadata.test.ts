@@ -927,6 +927,20 @@ describe('the rules and ACLs that scope what a reader sees', () => {
         })
     })
 
+    describe("ACLs on a work order's NaaS labour cost", () => {
+        const onField = (operation: string) =>
+            builtAcls().filter((acl) => acl.table === 'wm_order' && acl.field === 'x_daas_ham_labour_cost' && acl.operation === operation)
+
+        it('keep it to provider staff to read, and to asset managers and finance to change, whoever the platform lets into the work order', () => {
+            expect(onField('read').map((acl) => [[...acl.roles].sort(), acl.deny])).toEqual([[PROVIDER_STAFF, false]])
+            expect(onField('write').map((acl) => [[...acl.roles].sort(), acl.deny])).toEqual([[[ROLE.assetManager, ROLE.finance].sort(), false]])
+        })
+
+        it('leave the work order itself to the platform: the app has no record ACL on wm_order', () => {
+            expect(recordAcls().filter((acl) => acl.table === 'wm_order')).toEqual([])
+        })
+    })
+
     describe('create ACLs of Orders, Order lines and Returns', () => {
         const creators = (table: string) => recordAcls().filter((acl) => acl.table === table && acl.operation === 'create')
         const forCustomer = (table: string) => creators(table).filter((acl) => acl.roles.some(isCustomerRole))

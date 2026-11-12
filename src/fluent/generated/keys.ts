@@ -935,6 +935,14 @@ declare global {
                         table: 'sys_security_acl'
                         id: 'e7703c7668964030a8199c3e8067bdc7'
                     }
+                    acl_wm_order_labour_cost_read: {
+                        table: 'sys_security_acl'
+                        id: '3729ae41c40b4d17a425113bd4e35944'
+                    }
+                    acl_wm_order_labour_cost_write: {
+                        table: 'sys_security_acl'
+                        id: 'b6affce74bdd4008aa8c7b6eea533f3f'
+                    }
                     acl_ws_naas_assets: {
                         table: 'sys_security_acl'
                         id: '53561058881d4d578f4127523777e126'
@@ -5676,6 +5684,19 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_security_acl_role'
+                        id: '01de616a243a4e7aa0327bf651555a10'
+                        key: {
+                            sys_security_acl: 'b6affce74bdd4008aa8c7b6eea533f3f'
+                            sys_user_role: {
+                                id: '756e06fe791d4da28691694bb688b102'
+                                key: {
+                                    name: 'x_daas_ham.finance'
+                                }
+                            }
+                        }
+                    },
+                    {
                         table: 'sys_choice'
                         id: '01e0f6b6d775404f866ae91358028376'
                         key: {
@@ -5767,6 +5788,19 @@ declare global {
                                 id: 'b5e8a439671d4fd7ac1628ba1e558c28'
                                 key: {
                                     name: 'x_daas_ham.admin'
+                                }
+                            }
+                        }
+                    },
+                    {
+                        table: 'sys_security_acl_role'
+                        id: '021d981ddb8f4016a54e6f65b02b277e'
+                        key: {
+                            sys_security_acl: '3729ae41c40b4d17a425113bd4e35944'
+                            sys_user_role: {
+                                id: 'd33813ebacca4b79aad41517026036d8'
+                                key: {
+                                    name: 'x_daas_ham.account_manager'
                                 }
                             }
                         }
@@ -27510,6 +27544,19 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_security_acl_role'
+                        id: '6657788088fa4bcca618718c9b15f89f'
+                        key: {
+                            sys_security_acl: '3729ae41c40b4d17a425113bd4e35944'
+                            sys_user_role: {
+                                id: '756e06fe791d4da28691694bb688b102'
+                                key: {
+                                    name: 'x_daas_ham.finance'
+                                }
+                            }
+                        }
+                    },
+                    {
                         table: 'sys_documentation'
                         id: '665c2023c7574cd9be622f61d6bed412'
                         key: {
@@ -29405,6 +29452,19 @@ declare global {
                         key: {
                             document_key: '8d5475506e3644a69da2d1037961851a'
                             variable: '6aad5a575360220002c6435723dc34b0'
+                        }
+                    },
+                    {
+                        table: 'sys_security_acl_role'
+                        id: '6e28ccc334e8446eb6436f1fc199d099'
+                        key: {
+                            sys_security_acl: '3729ae41c40b4d17a425113bd4e35944'
+                            sys_user_role: {
+                                id: '4e548db0cdee42dfb31bc76a4de6214d'
+                                key: {
+                                    name: 'x_daas_ham.inventory_tech'
+                                }
+                            }
                         }
                     },
                     {
@@ -43719,6 +43779,19 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_security_acl_role'
+                        id: 'ad6a27344a874242b563407bf2e8983d'
+                        key: {
+                            sys_security_acl: '3729ae41c40b4d17a425113bd4e35944'
+                            sys_user_role: {
+                                id: 'b1a9a9832f01483a9c4e6fc55ca84188'
+                                key: {
+                                    name: 'x_daas_ham.field_tech'
+                                }
+                            }
+                        }
+                    },
+                    {
                         table: 'sys_ui_form_section'
                         id: 'ad7a8f02604b48498e4bd76f39c966c9'
                         deleted: true
@@ -49145,6 +49218,19 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_security_acl_role'
+                        id: 'c77e963d880745cabe1c9332b81fc5bd'
+                        key: {
+                            sys_security_acl: 'b6affce74bdd4008aa8c7b6eea533f3f'
+                            sys_user_role: {
+                                id: '50893530c7b94924ba2610453d4ebd3e'
+                                key: {
+                                    name: 'x_daas_ham.asset_manager'
+                                }
+                            }
+                        }
+                    },
+                    {
                         table: 'sys_ui_element'
                         id: 'c784561cf58c4e388a9d4c56b3d68608'
                         key: {
@@ -53112,6 +53198,19 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_security_acl_role'
+                        id: 'd9b702db31d740b189a9c009f78b4ad4'
+                        key: {
+                            sys_security_acl: '3729ae41c40b4d17a425113bd4e35944'
+                            sys_user_role: {
+                                id: 'c5156577be814d2aa8bf557ddec8bf0e'
+                                key: {
+                                    name: 'x_daas_ham.noc'
+                                }
+                            }
+                        }
+                    },
+                    {
                         table: 'sys_ui_element'
                         id: 'd9c4165a68104dad8695bac431945f58'
                         key: {
@@ -53970,6 +54069,19 @@ declare global {
                             }
                             element: 'deployed_assets'
                             position: '11'
+                        }
+                    },
+                    {
+                        table: 'sys_security_acl_role'
+                        id: 'dea42406339847b2b09d2af4352e8e88'
+                        key: {
+                            sys_security_acl: '3729ae41c40b4d17a425113bd4e35944'
+                            sys_user_role: {
+                                id: '50893530c7b94924ba2610453d4ebd3e'
+                                key: {
+                                    name: 'x_daas_ham.asset_manager'
+                                }
+                            }
                         }
                     },
                     {
