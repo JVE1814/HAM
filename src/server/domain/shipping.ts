@@ -426,6 +426,34 @@ export function newestEventAt(events: readonly { occurredAt: string }[]): string
 }
 
 /**
+ * The most tracking events taken from one update. An aggregator resends a parcel's whole history with every update,
+ * tens of scans; each one not stored yet is an insert made under the Shipment's tracking lock, in a request the
+ * aggregator wants answered within 7 seconds (EasyPost) or 10 (ShipEngine). A longer list is cut, not refused: the
+ * update's status still applies.
+ */
+export const MAX_TRACKING_EVENTS = 100
+
+/**
+ * `update` with at most `most` of its events, and how many were left out. The newest are kept, in the order they were
+ * listed: the older ones were stored from earlier updates, and an update is placed by its newest event
+ * (`newestEventAt`, `statusOvertaken`), which a cut from the other end would lose. Undated events are left out first,
+ * and of two at the same time the one listed earlier.
+ */
+export function boundedTracking(update: TrackingUpdate, most = MAX_TRACKING_EVENTS): { update: TrackingUpdate; dropped: number } {
+    const dropped = update.events.length - most
+    if (dropped <= 0) return { update, dropped: 0 }
+    const when = (occurredAt: string): number => {
+        const ms = Date.parse(occurredAt)
+        return Number.isFinite(ms) ? ms : -Infinity
+    }
+    const newestFirst = update.events
+        .map((event, index) => ({ index, at: when(event.occurredAt) }))
+        .sort((a, b) => (a.at === b.at ? b.index - a.index : b.at > a.at ? 1 : -1))
+    const kept = new Set(newestFirst.slice(0, most).map(({ index }) => index))
+    return { update: { ...update, events: update.events.filter((_event, index) => kept.has(index)) }, dropped }
+}
+
+/**
  * Whether a queued update's status is older news than the Shipment's: an event stored while it waited (`storedTimes`)
  * happened after its newest (`newestAt`), so an update applied meanwhile is newer, and this one's status, detail and
  * estimate would move the Shipment back (say from Out for delivery to In transit). A delivery or return is never
@@ -503,9 +531,22 @@ export function webhookToken(header: unknown, query: string): string {
     return given || query
 }
 
-/** Constant-time comparison of a webhook token with the configured secret (never matches an empty secret). */
+/**
+ * The fewest characters a configured webhook token has to be accepted. The route takes no platform login (ADR 0012),
+ * so the token is all that keeps a stranger from posting tracking updates, and a short one can be guessed. 32 is the
+ * length of a GUID, 128 bits when random, and both aggregators can send it: EasyPost takes a custom header value of
+ * under 1000 characters, and no limit is recorded for ShipEngine's (docs/research/external-contracts.md).
+ */
+export const WEBHOOK_TOKEN_MIN_LENGTH = 32
+
+/** Whether a configured secret is long enough to serve as the webhook token: one that is not counts as none. */
+export function webhookTokenUsable(secret: string): boolean {
+    return secret.length >= WEBHOOK_TOKEN_MIN_LENGTH
+}
+
+/** Constant-time comparison of a webhook token with the configured secret (never matches an empty or too short secret). */
 export function tokenMatches(given: string, secret: string): boolean {
-    if (!secret || given.length !== secret.length) return false
+    if (!webhookTokenUsable(secret) || given.length !== secret.length) return false
     let difference = 0
     for (let i = 0; i < secret.length; i++) difference |= given.charCodeAt(i) ^ secret.charCodeAt(i)
     return difference === 0

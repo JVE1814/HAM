@@ -148,7 +148,7 @@ checked by reading only. Each executor still runs its own gate.
 | [034](034-adr-react-workspace.md) | Record in an ADR that the workspace is a React page, not a Fluent Workspace | P3 | S | none | DONE (Owner-to-fill paragraph in ADR 0019 awaits the owner) |
 | [035](035-go-live-from-first-sighting.md) | Start billing from the first sighting since the install, also when the go-live is put off | P3 | M | 024 (landing order) | DONE (instance check pending) |
 | [036](036-scale-generator-field-check.md) | Hold the scale scripts to the app's columns and choices before they run on an instance | P3 | S | none; land before 022's instance run | DONE |
-| [037](037-tracking-webhook-bounds.md) | Refuse a short webhook token, and take at most 100 tracking events from one update | P3 | S | 030 (landing order) | TODO |
+| [037](037-tracking-webhook-bounds.md) | Refuse a short webhook token, and take at most 100 tracking events from one update | P3 | S | 030 (landing order) | DONE (instance check pending) |
 | [038](038-scheduled-returns-rotation.md) | Read scheduled returns on from where the last run stopped | P3 | S | none | TODO |
 | [039](039-manual-in-service-spike.md) | Draft the design of a manual in-service confirmation, with its open decisions | P3 | M (coarse) | none; reads 035 if present | DONE (9 open decisions await the owner) |
 | [040](040-p2-10-dashboard-tiles-spike.md) | Draft the missing P2.10 dashboard tiles: refresh, overdue returns and replacement SLA | P3 | S | none | TODO |

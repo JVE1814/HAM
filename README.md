@@ -193,6 +193,11 @@ On an instance where an earlier version was installed:
 - Nothing to enter for the new *First seen since install* on Assets
   (`alm_hardware.x_daas_ham_first_seen`): an Asset pending in service since before the upgrade
   has none, and goes in service from its last sighting since its install, as before.
+- Check the length of `x_daas_ham.shipping.webhook_token`. A token shorter than 32 characters is
+  no longer accepted: every tracking webhook is then answered HTTP 401, and the system log shows
+  *[x_daas_ham] Tracking webhook refused: x_daas_ham.shipping.webhook_token is shorter than 32
+  characters ...* (warning). Set a longer token (a random GUID will do) and register the same
+  value with the aggregator's webhook ([Integrations](#integrations)).
 - Work through the checks marked **After an upgrade** in
   [docs/verify-on-instance.md](docs/verify-on-instance.md): adopting the fleet and clearing the
   earlier version's column defaults, and clean-ups of returns, fees and spare-pool purchases.
@@ -280,7 +285,12 @@ API, billed to `x_daas_ham.shipping.carrier_id`). Register the tracking webhook 
 `https://<instance>/api/x_daas_ham/naas/shipping/tracking` with the custom header
 `X-NaaS-Webhook-Token: <x_daas_ham.shipping.webhook_token>` (ShipEngine `headers`, EasyPost
 `custom_headers`; `?token=` also works where the URL keeps it). ShipEngine and EasyPost tracker
-payloads are accepted. Labels are not voided through the aggregator: while a return label is still
+payloads are accepted. The token has at least 32 characters (`WEBHOOK_TOKEN_MIN_LENGTH` in
+`src/server/domain/shipping.ts`): while the property holds a shorter one, every webhook is
+answered HTTP 401 as for a wrong token, and each such call logs a warning that names the
+property, not the token. Of an update that lists more than 100 tracking events
+(`MAX_TRACKING_EVENTS`), only the newest 100 are taken, and a warning says how many were left
+out. Labels are not voided through the aggregator: while a return label is still
 *Label created* or *Exception*, void it with the carrier, then use *Mark label voided* on its
 Shipment so a new one can be created; a label in transit or out for delivery is the return under way.
 Ship's labels are voided the same way: while one is *Label created* or *Exception*, void it with the

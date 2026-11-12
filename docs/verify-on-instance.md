@@ -101,9 +101,11 @@ Confirm that *NaaS - the tracking webhook needs its token and records a delivery
 posts with the token are each answered HTTP 200 *delivered*: the route runs as guest, so this shows
 that `gs.getProperty` returns the scoped password2 token to guest despite its admin read role
 (external-contracts.md N45). Where `x_daas_ham.shipping.webhook_token` was empty before the run,
-confirm it is empty again after. The scripts spell out their modules' installed path, which names
-the version in `package.json`: after a build, `src/server/built-metadata.test.ts` fails when the
-version changes, until the paths are updated to match.
+confirm it is empty again after. A configured token shorter than 32 characters fails this test with
+HTTP 401 on both posts: set a longer one first (README "Upgrading"). The scripts spell out their
+modules' installed path, which names the version in `package.json`: after a build,
+`src/server/built-metadata.test.ts` fails when the version changes, until the paths are updated to
+match.
 
 ### Model lifecycle
 
