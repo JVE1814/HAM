@@ -163,7 +163,7 @@ export function claimRoutes(vendor: OemVendor): VendorClaimRoutes {
 
 /** Whether a run can send `vendor` an `action` step: a template's step it cannot is copied as one done by hand. */
 export function claimRouted(vendor: string, action: string): boolean {
-    return Boolean(claimRoutes(vendor as OemVendor)[action as ClaimAction])
+    return vendor in OEM_ADAPTERS && Boolean(claimRoutes(vendor as OemVendor)[action as ClaimAction])
 }
 
 /** Vendors with at least one automated step, in the order the claim run takes them. */

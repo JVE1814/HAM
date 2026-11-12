@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { enabledClaims, enabledRoutes, OEM_ADAPTERS, parseCoverageRow, type SyncApi } from './adapters'
+import { claimRouted, enabledClaims, enabledRoutes, OEM_ADAPTERS, parseCoverageRow, type SyncApi } from './adapters'
 import type { OemContext } from './sync-adapters'
 import type { HttpRequest, HttpResponse } from '../http'
 import type { OemVendor } from '../vocabulary'
@@ -332,6 +332,18 @@ describe('HPE Mist', () => {
             { serial: 'A4', covered: false, contractNumber: '', serviceLevel: '', startDate: undefined, endDate: undefined },
         ])
         expect(calls[0]).toEqual({ fn: 'jsi_by_serial', params: { org_id: 'org1', serial: 'A1' } })
+    })
+})
+
+describe('claimRouted', () => {
+    it('sends a step only to a vendor with a route for it', () => {
+        expect(claimRouted('meraki', 'oem_claim')).toBe(true)
+        expect(claimRouted('cisco', 'oem_claim')).toBe(false)
+    })
+
+    it('leaves a step to a person when the Model names no vendor, or one the app does not know', () => {
+        expect(claimRouted('', 'oem_claim')).toBe(false)
+        expect(claimRouted('acme', 'oem_claim')).toBe(false)
     })
 })
 
