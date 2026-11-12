@@ -1,5 +1,5 @@
 import { addDays, addMonths } from './calendar.ts'
-import { activeDays, currencyCode, currencyKey, divideRounded, fromCents, isMonth, previousMonth, toCents, type MonthBounds } from './money.ts'
+import { activeDays, currencyKey, divideRounded, fromCents, isMonth, previousMonth, toCents, type MonthBounds } from './money.ts'
 import { FLEET_CONDITION, fleetStagesQuery } from './fleet.ts'
 import { DEPLOYED_STAGES } from './lifecycle.ts'
 import { BILLING_PERIOD_STATUS, STAGE_FIELDS, SUBSCRIPTION_LINE_STATUS, SUBSCRIPTION_LINE_TYPE } from './vocabulary.ts'
@@ -27,16 +27,6 @@ function prorate(monthlyRate: number, units: number, daysInMonth: number): numbe
     if (daysInMonth <= 0) return 0
     const rate = Math.round(monthlyRate * RATE_SCALE)
     return fromCents(divideRounded(rate * Math.round(units), daysInMonth * (RATE_SCALE / 100)))
-}
-
-/**
- * Why a currency entered on an Agreement cannot be saved (it must be a three-letter code, e.g. EUR), or null when it
- * can: caught as it is entered, not when every line of the Agreement fails to bill. Blank is left to the field's
- * mandatory check (an Agreement saved before it had one keeps saving until finance sets it).
- */
-export function agreementCurrencyProblem(value: string): string | null {
-    if (value.trim() === '' || currencyCode(value)) return null
-    return `'${value.trim()}' is not a currency code: enter the three letters of an ISO 4217 code, e.g. EUR`
 }
 
 /** The days one Asset (or `count` Assets) delivered a Subscription line at a Site (end inclusive; none while still in service). */

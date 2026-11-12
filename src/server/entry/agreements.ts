@@ -1,6 +1,5 @@
 import { gs, type GlideRecord } from '@servicenow/glide'
-import { agreementCurrencyProblem } from '../domain/billing.ts'
-import { currencyCode } from '../domain/money.ts'
+import { agreementCurrencyProblem, currencyCode } from '../domain/money.ts'
 import { todayIso } from '../platform/clock.ts'
 import { warnExpiringCoverage } from '../platform/coverage-warnings.ts'
 import { queueRefresh, runRefreshPass } from '../platform/lifecycle-dates.ts'
