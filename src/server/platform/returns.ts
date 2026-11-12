@@ -103,16 +103,16 @@ export function raiseReturn(request: ReturnRequest): RaisedReturn | null {
  * the platform refuses it (`raiseReturn`).
  */
 export function returnSwappedAssets(order: GlideRecord, assetIds: readonly string[]): RaisedReturn | null {
-    const orderType = choice<OrderType>(order, 'order_type')
+    const trigger = swapReturnTrigger(choice<OrderType>(order, 'order_type'))
     return raiseReturn({
-        trigger: swapReturnTrigger(orderType),
+        trigger,
         customerId: str(order, 'customer'),
         siteId: str(order, 'site'),
         agreementId: str(order, 'agreement'),
         method: collectionMethod(str(order, 'install_mode') as InstallMode),
         assetIds,
         sourceOrderId: order.getUniqueValue(),
-        description: `${orderType === 'refresh' ? 'Refresh swap-back' : 'Defective unit'} from ${str(order, 'number')}`,
+        description: `${trigger === RETURN_TRIGGER.refresh_swap_back ? 'Refresh swap-back' : 'Defective unit'} from ${str(order, 'number')}`,
     })
 }
 
