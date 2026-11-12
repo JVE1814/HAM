@@ -11,6 +11,12 @@
   billed. An Asset back in service on or before the day its interval on the same line closed gets
   that interval reopened, so no day is billed twice. The rule also runs when the stage change clears
   the Asset's Subscription line, so the interval still closes.
+- An interval that has not started yet when its Asset leaves service is removed, not closed. An
+  Asset back in service at another line or Site on the day its interval closed gets its new
+  interval from the day after, so that day is billed once. If it leaves service again that same
+  day, the new interval has delivered no day. Closing it would bill its first day, a day the Asset
+  was not in service, so the rule deletes it. A delete the platform refuses is logged as a warning,
+  as a refused close is, and the interval stays open, to remove by hand.
 - A Service interval records its Asset's Subscription line and Site once, as it opens. So the rule
   also runs when the Subscription line or the Site of a fleet asset is changed, and moves the
   interval of a unit that stays in service (an asset manager may change a unit's line by hand, ADR

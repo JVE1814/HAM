@@ -112,7 +112,8 @@ function inServiceNow(assetId: string): boolean {
 }
 
 /**
- * Stop billing an Asset: its open intervals end on `endIso` (inclusive). It takes turns with the open under the Asset's
+ * Stop billing an Asset: its open intervals end on `endIso` (inclusive), and one that starts later, which delivered no
+ * day, is removed (leaveInterval). It takes turns with the open under the Asset's
  * interval lock (see openServiceInterval) and closes only while the Asset, read afresh there, is still out of service:
  * one a later save put back in service keeps its interval, which that save's open then finds open. A save that finds
  * the lock held tries again, then leaves the close to the holder; an interval still open for an Asset out of service
@@ -140,8 +141,7 @@ function closeHolding(lock: HeldLock, assetId: string, endIso: string): void {
     let closed = ''
     while (interval.next()) {
         const serial = str(interval, 'asset.serial_number')
-        interval.setValue('end_date', intervalEnd(str(interval, 'start_date'), endIso))
-        if (interval.update()) {
+        if (leaveInterval(interval, endIso)) {
             closed = serial
             continue
         }
@@ -217,13 +217,14 @@ function moveHolding(lock: HeldLock, assetId: string, todayIso: string): void {
 }
 
 /**
- * End the open `interval` on `todayIso` for an Asset that moved elsewhere: false when the platform refuses. One that
- * starts later (the day after an earlier move today) has billed no day and is deleted, so the Asset goes on from the
- * interval before it.
+ * End the open `interval` on `lastIso` for an Asset that left service or moved elsewhere: false when the platform
+ * refuses. One that starts later (the day after an interval elsewhere ended that day) has delivered no day and is
+ * deleted (intervalEnd), so the Asset goes on from the interval before it.
  */
-function leaveInterval(interval: GlideRecord, todayIso: string): boolean {
-    if (str(interval, 'start_date') > todayIso) return interval.deleteRecord()
-    interval.setValue('end_date', todayIso)
+function leaveInterval(interval: GlideRecord, lastIso: string): boolean {
+    const end = intervalEnd(str(interval, 'start_date'), lastIso)
+    if (end === null) return interval.deleteRecord()
+    interval.setValue('end_date', end)
     return Boolean(interval.update())
 }
 

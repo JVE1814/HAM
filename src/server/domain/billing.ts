@@ -39,9 +39,13 @@ export interface ServiceInterval {
     count?: number
 }
 
-/** The last day (inclusive) of a Service interval that started on `start` and is closed on `closedOn`: never before it started. */
-export function intervalEnd(start: string, closedOn: string): string {
-    return closedOn < start ? start : closedOn
+/**
+ * The last day (inclusive) of a Service interval that started on `start` and is closed on `closedOn`, or null for one
+ * that starts later (the day after an interval elsewhere ended, restartInterval): it delivered no day, so it is removed
+ * and not ended, which would bill its first day.
+ */
+export function intervalEnd(start: string, closedOn: string): string | null {
+    return closedOn < start ? null : closedOn
 }
 
 /** Where an Asset in service is billed: the Subscription line it delivers ('' for none) and its Site. A Service interval records both once, as it opens. */

@@ -645,6 +645,20 @@ describe('a save of a fleet asset', () => {
         expect(billed()).toEqual([['sub1', 'site1', '2026-11-09', '']])
     })
 
+    it('bills no day at the Site a unit came back to and left again on the day it first left service', () => {
+        const elsewhere = { x_daas_ham_site: 'site2' }
+        saved(unit('in_service'), unit('missing'))
+        saved(unit('missing'), unit('in_service', elsewhere))
+        expect(billed()).toEqual([
+            ['sub1', 'site1', '2026-10-01', TODAY],
+            ['sub1', 'site2', '2026-11-12', ''],
+        ])
+
+        saved(unit('in_service', elsewhere), unit('missing', elsewhere))
+
+        expect(billed()).toEqual([['sub1', 'site1', '2026-10-01', TODAY]])
+    })
+
     it('closes the interval, and opens none, for a save that takes the unit out of service and clears its line and Site', () => {
         saved(unit('in_service'), unit('pending_evaluation', { x_daas_ham_subscription_line: '', x_daas_ham_site: '' }))
 

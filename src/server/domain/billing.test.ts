@@ -62,8 +62,9 @@ describe('intervalEnd', () => {
         expect(intervalEnd('2026-11-07', '2026-11-07')).toBe('2026-11-07')
     })
 
-    it('never ends one before it started', () => {
-        expect(intervalEnd('2026-11-10', '2026-11-07')).toBe('2026-11-10')
+    it('gives no last day to one that starts later: it delivered no day, and is removed', () => {
+        expect(intervalEnd('2026-11-08', '2026-11-07')).toBeNull()
+        expect(intervalEnd('2026-11-10', '2026-11-07')).toBeNull()
     })
 })
 

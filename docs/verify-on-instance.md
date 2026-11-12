@@ -875,6 +875,22 @@ every month, and the rule refuses its next save until it has one. List Subscript
 day it should be billed. A Billing period still *Ready for review* that billed such a line past
 that day is put right with *Regenerate*. A closed period is not changed: credit it by hand.
 
+### Service interval not yet started
+
+As a user who is not an admin, take a fleet asset in service that has an open Service interval out
+of service (declare it missing): the interval gets today as its *Last day*. Put it back in service
+the same day at another *Site* (a Seen signal, or its stage set by hand): a new interval is
+created with tomorrow as its *First day*. Take it out of service again the same day: the new
+interval is gone, and the first one still ends today. No interval of the Asset is left with a
+*First day* after today. The rule deletes the interval in the save of that user, as it creates and
+ends one. If the platform refuses the delete, the interval stays open and the log has
+*[x_daas_ham] <serial> left service on <date>, its Service interval did not close: ...* (warning):
+an admin deletes it by hand.
+
+**After an upgrade:** an interval closed this way before this release has one day, the day after
+its Asset's interval before it ended, and bills that day. Nothing tells it from the interval of a
+unit that was in service for one day, so none is removed.
+
 ### Replacement SLA stop
 
 Completing a replacement Order queues the event `x_daas_ham.replacement.complete` on it. Its script

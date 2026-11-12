@@ -39,6 +39,36 @@ describe('stopping billing for an Asset', () => {
 
         expect(interval().end_date).toBe('')
     })
+
+    describe('whose open interval has not started yet', () => {
+        beforeEach(() => {
+            // It left service on the 9th, went back in service elsewhere that day (billed from the 10th), and leaves again.
+            platform.tables[INTERVALS] = [
+                { sys_id: 'int1', asset: 'asset1', subscription_line: 'sub1', start_date: '2025-10-01', end_date: '2025-11-09' },
+                { sys_id: 'int2', asset: 'asset1', subscription_line: 'sub2', start_date: '2025-11-10', end_date: '' },
+            ]
+            platform.tables[ASSETS] = [assetIn('pending_return')]
+        })
+
+        it('removes that interval, which delivered no day, and keeps the one before it as it ended', () => {
+            closeServiceIntervals('asset1', '2025-11-09')
+
+            expect(platform.tables[INTERVALS]).toEqual([expect.objectContaining({ sys_id: 'int1', start_date: '2025-10-01', end_date: '2025-11-09' })])
+            expect(platform.tables.x_daas_ham_job_lock).toEqual([])
+        })
+
+        it('says so when the platform refuses to remove it, and leaves it open', () => {
+            platform.refuses = (table, _row, operation) => (table === INTERVALS && operation === 'delete' ? 'no' : '')
+
+            closeServiceIntervals('asset1', '2025-11-09')
+
+            expect(platform.tables[INTERVALS]?.map((row) => [row.sys_id, row.end_date])).toEqual([
+                ['int1', '2025-11-09'],
+                ['int2', ''],
+            ])
+            expect(platform.warnings).toEqual(['[x_daas_ham] FOC111 left service on 2025-11-09, its Service interval did not close: no'])
+        })
+    })
 })
 
 describe('moving the billing of an Asset in service', () => {
