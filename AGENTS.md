@@ -37,8 +37,6 @@ each line points at the place that explains it. Use the words of `CONTEXT.md` in
 - A lock name goes in `src/server/domain/lock-names.ts`, in the order ADR 0013 gives.
 - A test is a `*.test.ts` file beside its module. A test of `platform/` or `entry/` runs against
   `src/server/test-support/fake-glide.ts`, which runs no business rule, ACL or flow.
-- `npm run build` type-checks `src/client/**/*.test.ts` with the libs of `src/client/tsconfig.json`,
-  which have no `DOM.Iterable`. A client test can pass `npm run typecheck` and still fail the build.
 - Lint skips what git ignores, so keep scratch files in a git-ignored folder (`.git/info/exclude`).
 
 ## Where things are
