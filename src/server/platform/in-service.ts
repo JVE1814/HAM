@@ -2,7 +2,7 @@ import { GlideRecord } from '@servicenow/glide'
 import { JOB } from '../domain/chunked-job.ts'
 import { isStateChange, type DeviceEvent } from '../domain/device-events.ts'
 import { fleetStagesQuery } from '../domain/fleet.ts'
-import { decideInService, seenSourceOf } from '../domain/in-service.ts'
+import { decideInService, firstSeenSinceInstall, seenSourceOf } from '../domain/in-service.ts'
 import { LONG_HOLD_LOCK_TRIES, type HeldLock } from '../domain/job-lock.ts'
 import { LOCK } from '../domain/lock-names.ts'
 import type { OrderType, SeenSource } from '../domain/vocabulary.ts'
@@ -18,6 +18,13 @@ import { attachToSubscription } from './subscriptions.ts'
 
 /** In-service detection: Seen signals in, billing start out (P1.8), and the device events they are kept as. */
 
+/**
+ * The first sighting since the Asset's install, kept while it is pending in service (domain/in-service
+ * `firstSeenSinceInstall`): last_seen moves on with every sighting, so a go-live put off would otherwise start billing
+ * from a later one.
+ */
+const FIRST_SEEN = 'x_daas_ham_first_seen'
+
 function recordSeen(asset: GlideRecord, at: number, source: SeenSource): void {
     const previous = glideToMs(str(asset, 'x_daas_ham_last_seen'))
     if (previous !== undefined && previous >= at) return
@@ -26,16 +33,25 @@ function recordSeen(asset: GlideRecord, at: number, source: SeenSource): void {
 }
 
 /**
- * Put a pending Asset in service if it has been seen since its install, and save it. False when it saved nothing:
+ * Put a pending Asset in service if it has been seen since its install, from its first sighting since then, and save
+ * it. False when it saved nothing:
  * having outlasted its sighting `lock` (ADR 0013), as the sighting that took the lock over read the Asset after this
  * one, or because the save was refused (logged), so the sighting is applied again when sent again or at the next run.
  */
 function goLiveIfSeen(lock: HeldLock, asset: GlideRecord, readers: LifecycleReaders): boolean {
     const stage = readStage(asset)
+    const seen = {
+        installCompletedAt: glideToMs(str(asset, 'x_daas_ham_install_completed')),
+        firstSeenAt: glideToMs(str(asset, FIRST_SEEN)),
+        lastSeenAt: glideToMs(str(asset, 'x_daas_ham_last_seen')),
+    }
+    if (stage === 'pending_in_service') {
+        const first = firstSeenSinceInstall(seen)
+        asset.setValue(FIRST_SEEN, first === undefined ? '' : msToGlide(first))
+    }
     const decision = decideInService({
         stage,
-        installCompletedAt: glideToMs(str(asset, 'x_daas_ham_install_completed')),
-        lastSeenAt: glideToMs(str(asset, 'x_daas_ham_last_seen')),
+        ...seen,
         // Only a pending Asset can go live, so only it pays for the dot-walk to its Order.
         temporary: stage === 'pending_in_service' && choice<OrderType>(asset, 'x_daas_ham_order_line.order.order_type') === 'temporary',
     })

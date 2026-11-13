@@ -36,10 +36,11 @@ import {
     type ReturnTrigger,
     TASK_STATE,
 } from '../domain/vocabulary.ts'
+import { isCustomerContact } from '../domain/visibility.ts'
 import { customerAdminIds } from './approvals.ts'
 import { clearWipeEvidence, isFleetAsset, moveAndSave, moveRefusal, readStage, transitionFacts } from './assets.ts'
 import { runTableJob } from './chunked.ts'
-import { nowGlide, todayIso } from './clock.ts'
+import { daysAgoGlide, nowGlide, todayIso } from './clock.ts'
 import { fire } from './events.ts'
 import { EVENT } from '../domain/events.ts'
 import { recordFee, waiveOpenFees } from './fees.ts'
@@ -49,8 +50,8 @@ import { clearRackPlacement } from './racks.ts'
 import { attemptLock, withLock } from './locks.ts'
 import { intProperty } from './properties.ts'
 import { PROPERTY } from '../domain/properties.ts'
-import { bool, choice, exists, findById, num, refusal, str, warnRefused } from './records.ts'
-import { creatorOf } from './session.ts'
+import { addWorkNote, bool, choice, exists, findById, num, refusal, removeStored, str, warnRefused } from './records.ts'
+import { creatorOf, currentSession } from './session.ts'
 import { moveAlongPath } from './stock.ts'
 import { endSitePackageIfEmpty } from './subscriptions.ts'
 import { SITE_FIELD } from '../domain/fleet.ts'
@@ -141,7 +142,7 @@ function fillReturn(order: GlideRecord, request: ReturnRequest): RaisedReturn {
         // Nothing installed, everything already on another Return order, or every unit refused: close straight away.
         order.setValue('state', TASK_STATE.closedComplete)
         const note = refused > 0 ? 'No unit could be added (see the system log).' : 'No equipment to bring back.'
-        order.setValue('work_notes', note)
+        addWorkNote(order, note)
     } else if (opensDeinstallWork(request.trigger, request.method)) {
         const context = {
             customerId: request.customerId,
@@ -154,7 +155,7 @@ function fillReturn(order: GlideRecord, request: ReturnRequest): RaisedReturn {
             order.setValue('change_request', work.changeId)
             order.setValue('work_order', work.workOrderId)
         } else {
-            order.setValue('work_notes', 'De-install work not opened (see the system log): open it by hand.')
+            addWorkNote(order, 'De-install work not opened (see the system log): open it by hand.')
         }
     }
     // Its lines and moves are saved, but a Return without its due date is never chased: logged to set it by hand.
@@ -339,7 +340,9 @@ export function requestProducedReturn(order: GlideRecord, listedAssetIds: readon
         method: str(order, 'method') as ReturnMethod | '',
         describe: () => str(order, 'short_description') || `Return from ${order.getDisplayValue('site')}`,
     })
-    if (!outcome.raised && !order.deleteRecord()) warnRefused(order, `Refused return ${str(order, 'number')} not removed`)
+    if (outcome.raised) return outcome
+    const kept = removeStored(order)
+    if (kept) log.warn(`Refused return ${str(order, 'number')} not removed: ${kept}`)
     return outcome
 }
 
@@ -351,6 +354,28 @@ function requestedSite(siteId: string, site: GlideRecord | null): RequestedRetur
 function returnRequester(produced: GlideRecord | undefined): ReturnRequester {
     const { permitted, scope, customerId } = creatorOf(produced ?? new GlideRecord(RETURN))
     return { mayRequest: permitted, scope, customerId }
+}
+
+/**
+ * Why the Return order `current`, about to be inserted, is refused, or null: the check of the before-insert rule
+ * (entry/returns `guardContactReturn`). In a Customer contact's session it must name the contact's own Customer and
+ * one of that Customer's Sites (domain/returns `returnRequestFindings`), whatever inserts it: the record producer, the
+ * customer page, a form or the Table API. The customer admins' create ACL cannot hold a Return to that: it passes one
+ * that names no Customer yet (domain/visibility `grantsReturnOfOwnCustomer`) and never looks at the Site.
+ *
+ * Who asks is not judged here: the create ACL and the services that raise a Return (`requestReturn`) decide that. So
+ * the app's own inserts in a contact's session pass, a site contact's too: confirming a self-install raises the
+ * swap-back of the units it replaced (`returnSwappedAssets`), for the Order's own Customer and Site. Anyone else
+ * (provider staff, the service desk, a job) raises Returns for any Customer and is not checked.
+ */
+export function contactReturnInsertRefusal(current: GlideRecord): string | null {
+    const { scope, customerId } = currentSession()
+    if (!isCustomerContact(scope)) return null
+    const siteId = str(current, 'site')
+    const asContact: ReturnRequester = { mayRequest: true, scope: 'own_customer', customerId }
+    const request = { customerId: str(current, 'customer'), site: requestedSite(siteId, findById('cmn_location', siteId)) }
+    const [finding] = returnRequestFindings(request, asContact)
+    return finding ? `Return not raised. ${finding.message}.` : null
 }
 
 /**
@@ -455,7 +480,8 @@ export function evaluateReturnLine(line: GlideRecord): Evaluation {
  * runs at once (the scheduled job and an *Execute now*) would both read a Return order as not escalated and each notify
  * its Customer, and both advance the job's one cursor, so a run holds a job lock (ADR 0013) throughout; one that finds
  * it held chases nothing and logs so. Taking the lock throws only when an insert is refused with no lock row
- * (platform/locks): that error escapes.
+ * (platform/locks): that error escapes. Under the same lock the run then closes the Return orders that no line keeps
+ * open (`closeDoneReturns`).
  */
 export function chaseOverdue(): void {
     const lockName = LOCK.overdueReturnsRun()
@@ -483,7 +509,7 @@ function chaseHolding(): void {
             const step = overdueStep({ dueDate: line.dueDate, today, graceDays: grace, escalated: bool(returnOrder, 'escalated') })
             if (step === 'escalate') {
                 returnOrder.setValue('escalated', true)
-                returnOrder.setValue('work_notes', `Return overdue since ${line.dueDate}; customer and account manager notified.`)
+                addWorkNote(returnOrder, `Return overdue since ${line.dueDate}; customer and account manager notified.`)
                 // Not marked escalated, it would be escalated again every day: nobody is told until the mark holds.
                 if (!returnOrder.update()) return void warnRefused(returnOrder, `${number} not escalated`)
                 const recipients = [...customerAdminIds(str(returnOrder, 'customer')), str(returnOrder, 'agreement.account_manager')]
@@ -491,6 +517,31 @@ function chaseHolding(): void {
             } else if (step === 'declare_missing') {
                 declareMissing({ lineId, assetId: line.assetId, returnOrderId: line.returnOrderId, number })
             }
+        },
+    })
+    closeDoneReturns()
+}
+
+/** A Return order this new is not closed for having no line: one inserted by hand may still get its lines. */
+const DONE_RETURN_GRACE_DAYS = 1
+
+/**
+ * Close the open Return orders that no line keeps open (the daily job, after its chase and under its run lock). A
+ * Return is closed as its last line is evaluated or declared missing (`closeReturnIfDone`) and nothing looks at it
+ * again, so two kinds would stay open for good, asking the Customer for equipment they do not await: one whose close
+ * the platform refused then, and one that never had a line (inserted by hand, or raised with no unit when its close
+ * or its removal was refused). A second pass of the job (ADR 0007), with a cursor of its own: it reads every open
+ * Return order, as no query can ask for those without a line.
+ */
+function closeDoneReturns(): void {
+    runTableJob({
+        job: JOB.closeDoneReturns,
+        table: RETURN,
+        query: `active=true^sys_created_on<${daysAgoGlide(DONE_RETURN_GRACE_DAYS)}`,
+        read: (returnOrder) => str(returnOrder, 'number'),
+        handle: (number, returnOrderId) => {
+            const note = 'Closed by the daily job: no unit on it is awaited or being evaluated.'
+            if (closeReturnIfDone(returnOrderId, note)) log.info(`Return ${number} closed by the daily job: no line keeps it open`)
         },
     })
 }
@@ -561,11 +612,15 @@ function mayGoMissing(asset: GlideRecord, stage: Stage | null): boolean {
     return isDeployed(stage) && checkTransition(stage, 'missing', transitionFacts(asset)).allowed
 }
 
-function closeReturnIfDone(returnOrderId: string): void {
-    if (exists(RETURN_LINE, `return_order=${returnOrderId}^statusIN${KEEPS_RETURN_OPEN.join(',')}`)) return
+/** Close the Return order once no line keeps it open, with `note` as its work note when given. True when this call closed it. */
+function closeReturnIfDone(returnOrderId: string, note = ''): boolean {
+    if (exists(RETURN_LINE, `return_order=${returnOrderId}^statusIN${KEEPS_RETURN_OPEN.join(',')}`)) return false
     const order = findById(RETURN, returnOrderId)
-    if (!order || str(order, 'state') === String(TASK_STATE.closedComplete)) return
+    if (!order || str(order, 'state') === String(TASK_STATE.closedComplete)) return false
     order.setValue('state', TASK_STATE.closedComplete)
-    // No later line calls this again, and an open Return still asks the Customer for its equipment.
-    if (!order.update()) warnRefused(order, `Return ${str(order, 'number')} not closed, close it`)
+    if (note) addWorkNote(order, note)
+    if (order.update()) return true
+    // No later line calls this again: the daily job closes it (`closeDoneReturns`), and warns again while it is refused.
+    warnRefused(order, `Return ${str(order, 'number')} not closed, close it`)
+    return false
 }

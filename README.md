@@ -69,7 +69,8 @@ on-demand job **NaaS - preflight check** (System Definition > Scheduled Jobs); i
 
 The table says what each plugin is used for. What the preflight check looks for is one list in the
 code: the tables in `REQUIRED_TABLES` and the roles in `REQUIRED_ROLES`
-(`src/server/domain/preflight.ts`).
+(`src/server/domain/preflight.ts`). It also reports settings to correct: a short webhook token, and
+a record producer the platform still keeps from a criterion ([Install](#install)).
 
 The roles that must exist are the platform roles in `PLATFORM_ROLE` (`src/server/domain/roles.ts`).
 The app's own roles contain most of them. The app also grants Customer Service's service desk role
@@ -134,6 +135,30 @@ works at the NaaS stockrooms whose *Assignment group* they are a member of. Sett
 *Assignment group* takes the platform's `inventory_admin` (which `x_daas_ham.admin` contains); adding
 a user to a group takes `user_admin`.
 
+Open the two record producers to Customer admins. The app makes each *Available for* the user
+criterion *NaaS - Order and Return raisers* (asset managers, account managers, NOC, the service desk
+and Customer admins). The platform gives every new catalog item *Not available for: SNC External*,
+which wins over *Available for*, and every Customer admin is `snc_external`. No install removes that
+row, and the app's scope may not delete it, so after the install an admin runs this background
+script in global scope (*System Definition > Scripts - Background*):
+
+```js
+var row = new GlideRecord('sc_cat_item_user_criteria_no_mtom');
+row.addQuery('sc_cat_item.sys_scope.scope', 'x_daas_ham');
+row.addQuery('user_criteria.name', 'SNC External');
+row.query();
+while (row.next()) gs.print(row.getDisplayValue('sc_cat_item') + ': ' + (row.deleteRecord() ? 'removed' : 'kept'));
+```
+
+It prints each producer with `removed`. Run it only once the install has added *Available for*: the
+platform adds the row back at once to a catalog item left with no criterion. The preflight check
+names each producer that still has such a row
+([customer creates](docs/verify-on-instance.md#customer-creates)).
+
+The two machine roles go to integration users only, one user each: `x_daas_ham.integration` to
+the NMS's user and `x_daas_ham.billing_reader` to the billing consumer's
+([Integrations](#integrations)). Neither is contained in a staff role.
+
 Mark what is NaaS ([ADR 0016](docs/adr/0016-fleet-assets.md)): give each NaaS stockroom its
 *Stockroom type* (central depot, staging centre or customer site) and each NaaS Model its *OEM PID*
 and a *Model category* (e.g. *Network Gear*). A stockroom with no type and a Model without an OEM
@@ -180,6 +205,24 @@ On an instance where an earlier version was installed:
   are now counted by *Customer admins asked*, which the app saves when it asks for approval. On a
   task asked before that, the field is empty and reads as "no Customer admin asked", so a provider
   approval would stand in for the Customer admins.
+- Straight after upgrading, give the billing consumer's integration user the role
+  `x_daas_ham.billing_reader`, which this version adds, and take `x_daas_ham.integration` from
+  it. The billing pull API no longer admits `x_daas_ham.integration`, so until then its pulls are
+  answered HTTP 403. Nothing is lost by that: a pull is a read, to send again. Where the NMS and
+  the billing consumer shared one user, give the billing consumer a user of its own
+  ([machine roles](docs/verify-on-instance.md#machine-roles)).
+- Straight after upgrading, remove *Not available for: SNC External* from both record producers
+  with the script in [Install](#install): until then no Customer admin can open them. The producers
+  are now offered only to asset managers, account managers, NOC, the service desk and Customer
+  admins, so internal users without one of those roles no longer see them.
+- Nothing to enter for the new *First seen since install* on Assets
+  (`alm_hardware.x_daas_ham_first_seen`): an Asset pending in service since before the upgrade
+  has none, and goes in service from its last sighting since its install, as before.
+- Check the length of `x_daas_ham.shipping.webhook_token`. A token shorter than 32 characters is
+  no longer accepted: every tracking webhook is then answered HTTP 401, and the preflight check
+  reads *1 setting(s) to correct: x_daas_ham.shipping.webhook_token is shorter than 32 characters
+  ...* ([Required plugins](#required-plugins)). Set a longer token (a random GUID will do) and
+  register the same value with the aggregator's webhook ([Integrations](#integrations)).
 - Work through the checks marked **After an upgrade** in
   [docs/verify-on-instance.md](docs/verify-on-instance.md): adopting the fleet and clearing the
   earlier version's column defaults, and clean-ups of returns, fees and spare-pool purchases.
@@ -245,7 +288,7 @@ role, which the asset manager role contains): lifecycle type *Publisher*, the ph
 The list shows the *Publisher* rows of NaaS Models, the ones the app reads; a row left on the form's
 default type, *Internal*, is an organisation's own plan for the Model, which the app ignores.
 
-**Billing pull API** (role `x_daas_ham.finance` or `x_daas_ham.integration`):
+**Billing pull API** (role `x_daas_ham.finance` or `x_daas_ham.billing_reader`):
 `GET /api/x_daas_ham/naas/billing_periods` and
 `GET /api/x_daas_ham/naas/billing_periods/{id}/lines?offset=<n>&limit=<n>` (`final` once the period is
 closed, `nextOffset` null on the last page; `PULL_PAGE` in `src/server/domain/billing.ts` holds the
@@ -253,8 +296,11 @@ page sizes and their caps). Each line carries its `currency`, and a period its
 `totals`, one per currency: there is no single `total`, as two currencies are never added
 ([billing spec](docs/spec/p3-billing.md)).
 
-The NMS and billing integrations sign in as an internal user, one without the `snc_external` role
-(the Explicit Roles plugin gives such a user `snc_internal`). Their routes, like the warehouse ones,
+The NMS and the billing consumer each sign in as an internal user of their own, one without the
+`snc_external` role (the Explicit Roles plugin gives such a user `snc_internal`). The NMS's user
+holds `x_daas_ham.integration` and the billing consumer's holds `x_daas_ham.billing_reader`: the
+billing pull API refuses the first and the device-events route the second, so neither credential
+does the other's work. Their routes, like the warehouse ones,
 require `snc_internal` and the platform's *Scripted REST External Default* ACL. Only the site, rack
 and `/customer/...` routes admit customer admins and site contacts (`shared/rest-api.now.ts`).
 The tracking webhook needs no sign-in and checks its token itself.
@@ -264,7 +310,12 @@ API, billed to `x_daas_ham.shipping.carrier_id`). Register the tracking webhook 
 `https://<instance>/api/x_daas_ham/naas/shipping/tracking` with the custom header
 `X-NaaS-Webhook-Token: <x_daas_ham.shipping.webhook_token>` (ShipEngine `headers`, EasyPost
 `custom_headers`; `?token=` also works where the URL keeps it). ShipEngine and EasyPost tracker
-payloads are accepted. Labels are not voided through the aggregator: while a return label is still
+payloads are accepted. The token has at least 32 characters (`WEBHOOK_TOKEN_MIN_LENGTH` in
+`src/server/domain/shipping.ts`): while the property holds a shorter one, every webhook is
+answered HTTP 401 as for a wrong token. Such a call logs nothing, since anyone can make it; the
+preflight check names the property, not the token. Of an update that lists more than 100 tracking events
+(`MAX_TRACKING_EVENTS`), only the newest 100 are taken, and a warning says how many were left
+out. Labels are not voided through the aggregator: while a return label is still
 *Label created* or *Exception*, void it with the carrier, then use *Mark label voided* on its
 Shipment so a new one can be created; a label in transit or out for delivery is the return under way.
 Ship's labels are voided the same way: while one is *Label created* or *Exception*, void it with the
@@ -302,7 +353,7 @@ src/server/
                  record producer): reads its inputs, calls a platform service, reports the
                  outcome in the trigger's terms
   test-support/  the tests' in-memory stand-in for Glide and their encoded-query evaluator
-src/client/      React UI pages (warehouse, rack elevation, customer self-service)
+src/client/      React UI pages (workspace, warehouse, rack elevation, customer self-service)
 ```
 
 Conventions that the build or tests enforce:
@@ -320,7 +371,9 @@ Conventions that the build or tests enforce:
   evaluator (`test-support/encoded-query.ts`), with the refusals, clock, user, queued events and log
   a test sets up. It keeps the platform's behaviour where that is known and throws on what it does
   not know (an operator, a dot-walk through a reference the test did not declare, a Glide method it
-  lacks), so no test passes on a guess. It runs no business rule, ACL or flow: those are ATF's.
+  lacks), so no test passes on a guess. `setValue` of `work_notes` or `comments` throws, as the
+  instance stores nothing for it; a note added with `addWorkNote` is stored by the save, and a test
+  reads it with `platform.notesOn`. It runs no business rule, ACL or flow: those are ATF's.
 - `.now.ts` files are evaluated by the SDK, not run: they hold constants, template literals over
   constants and property access, and imports of constants from `src/server/domain` (and the demo
   depot group's name from `entry/demo-seed.ts`, which seeds it), but no function call, loop, spread
@@ -396,11 +449,13 @@ the demo data loader).
   `Table({ augments })` per table, whichever feature a column serves), the REST API (one `RestApi`
   with every route) and the ACL that admits customer users to it, the entry modules' installed path,
   the menu root with its separators (a feature's navigator modules are in its folder and name the
-  root), the visibility rules and row checks with their ATF tests (ADR 0005: one concern over every
-  scoped table), the customer page (it reads several features) and the ATF suites (one per delivery
+  root), the read ACLs on the platform tables nearly every feature points at (`customer_account`,
+  `core_company`), the visibility rules and row checks with their ATF tests (ADR 0005: one concern
+  over every scoped table), the customer page (it reads several features) and the ATF suites (one per delivery
   phase, each listing tests of several features).
 - `workspace/` holds the workspace's UI page and its ACL. Its lists and its dashboard are data in
-  `src/client/workspace/` (`catalog.ts`, `dashboard.ts`), each one structure over every table.
+  `src/client/workspace/` (`catalog.ts`, `dashboard.ts`), each one structure over every table
+  ([ADR 0019](docs/adr/0019-workspace-is-a-react-page.md)).
 - A record's sys_id is keyed by its `$id` name in `generated/keys.ts`, not by its file: moving a
   record to another file changes nothing in the build.
 

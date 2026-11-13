@@ -30,6 +30,7 @@ describe('LOCK', () => {
         const a = sysId('a')
         const b = sysId('b')
         expect(LOCK.refreshOrders()).toBe('refresh_orders')
+        expect(LOCK.replacementCase(a)).toBe(`replacement_case_${a}`)
         expect(LOCK.agreementUsage(a)).toBe(`agreement_usage_${a}`)
         expect(LOCK.oemClaimRun()).toBe('oem_claim_run')
         expect(LOCK.oemCoverageRun()).toBe('oem_coverage_run')

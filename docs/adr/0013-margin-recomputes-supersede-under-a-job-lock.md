@@ -102,7 +102,8 @@ over-quota approval. So a submission holds `agreement_usage_<Agreement sys_id>` 
 the Order, its lines and the Agreement's quantities and usage through the save that takes the Order
 out of draft, and goes on only from draft, under the Agreement and Customer it locked and checked:
 a second submission of the same Order finds it gone ahead and says so. *Submit*, the record
-producer, *Raise replacement* and a submission queued again take it holding no lock. An Order whose
+producer and a submission queued again take it holding no lock, and *Raise replacement* holding
+only its case's lock (`replacement_case_`, below). An Order whose
 lines all replace Assets (break-fix, refresh) is assessed the same whatever is in flight, and its
 lines going into flight beside a holder's read of usage read as if it had come first or last, so its
 submit takes no usage lock. Under the usage lock, or holding nothing for such an Order, a submission
@@ -122,6 +123,15 @@ nothing, once the submission has let it go. A submit that outlasts the lock logs
 Order was submitted after its usage lock was lost.
 The lock orders submissions only: usage that changes without one (a line added to an Order already
 submitted, its Agreement changed, Assets adopted into the Agreement) is not assessed.
+*Raise replacement* on a case runs under `replacement_case_<case sys_id>`, holding no other lock
+when it takes it: it reads the Order the case links afresh there, raises the replacement Order,
+links it to the case and submits it. Two presses at once would otherwise each find the case
+linking no Order and raise one each, the first left going ahead unlinked. It does not retry: a
+press that finds the lock held raises nothing and says a replacement is being raised. Under it,
+the submission takes the Order's `source_order_` and, for a linked draft that gained a line adding
+a unit, its Agreement's `agreement_usage_`, so `replacement_case` comes before `agreement_usage`.
+The daily refresh run never takes it, and nothing under it takes `refresh_orders`. A press holds
+it for one raise, far short of `ABANDONED_AFTER_MINUTES`, so it does not check for a lost lock.
 The Asset rule that takes a unit lost in transit off its Order line takes no lock: it queues the
 Order's sourcing rather than take `source_order_<Order sys_id>` inside an Asset save. The rack
 re-check after an Asset's placement is saved takes `recon_exception_<type>_<rack sys_id>`. It holds
@@ -167,11 +177,13 @@ attestations and their items, whose rules take no lock. A run that has lost it o
 attestation.
 The daily chase of overdue returns holds `overdue_returns_run` for the whole run, so a run and an
 *Execute now* at once never both read a Return order as not escalated and notify its Customer
-twice, nor both advance the job's one cursor. It holds no other lock when it takes it, does not
+twice, nor both advance the job's cursors. It holds no other lock when it takes it, does not
 retry, and chases nothing when it finds it held. Under it, it declares each unit missing under that
 unit's `receive_asset_` lock, with what that takes under it, so it comes before `receive_asset`. A
-run ends on the job time budget (`x_daas_ham.job.budget_seconds`), well short of
-`ABANDONED_AFTER_MINUTES`, so it does not check for a lost lock.
+run makes two passes under it: the chase, then the close of the Return orders no line keeps open,
+which takes no other lock. Each pass ends on the job time budget
+(`x_daas_ham.job.budget_seconds`), so a run takes at most twice that, well short of
+`ABANDONED_AFTER_MINUTES` as shipped, and does not check for a lost lock.
 A unit is put on a Return order under `return_asset_<Asset sys_id>`: the check that it awaits no other
 return and the insert of its line are one critical section, so two Returns raised at once (a request
 sent twice, the record producer beside the customer page or an Agreement's end) never both take it.

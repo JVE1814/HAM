@@ -110,6 +110,50 @@ Allow-If field ACLs of its own too: provider staff read it, and asset managers a
 for `alm_asset.cost` write, one repeating `alm_asset.*`'s), so no verdict depends on how the platform matches ACLs
 across levels. The app's own logic saves through GlideRecord, which no ACL checks.
 
+What a Customer contact creates is held to their Customer by a rule as well as an ACL. A customer admin's create ACL on
+Orders and on Return orders checks the Customer the record names (`orders/access.now.ts`, `returns/access.now.ts`), and
+the Return's passes a record that names none yet, as the customer page asks `canCreate()` of an empty record. No ACL
+looks at the Site or the Agreement. So a before-insert rule on each table refuses, in a Customer contact's session, an
+Order that fails what *Submit* checks (`domain/entitlement` `ownershipFindings`) and a Return order that names another
+Customer, none, or a Site that is not its Customer's (`domain/returns` `returnRequestFindings`), whatever inserts it
+(`platform/orders` `contactOrderInsertRefusal`, `platform/returns` `contactReturnInsertRefusal`). A Customer contact
+is an external user, whose insert by hand (a form, the Table API) keeps no posted value: the platform's create field
+ACLs let only internal users set a field. Such a Return order names no Customer and is refused, and such an Order fails
+its create ACL. So the Site and Agreement checks guard the inserts that keep the values: the record producer, the
+customer page, a script. The record producers run the same check in their own script, before the insert
+(`entry/orders` `beforeOrderProduced`, `entry/returns` `beforeReturnProduced`): a producer request a before-insert
+rule refuses still stores its answers in `question_answer`, which no application may delete, and one the producer's
+script refuses stores none (docs/research/external-contracts.md N48). The rule on Return orders does not judge who
+asks, which the create ACL and the services do: a site contact's confirmation of a self-install raises the swap-back
+Return in their own session. Provider staff, the service desk and jobs are not checked.
+
+What provider staff read of the platform's tables is granted where the app's records point at them. A reference
+shows, and a list is searched or grouped by it, only when the reader reads the table it points at and that table's
+display field (docs/research/external-contracts.md N50). Customer Service's ACLs on `customer_account`, and Asset
+Management's on `core_company`, `cmdb_ci` and `proc_po`, name roles that no NaaS role holds, or that only the platform's
+`asset` role contains, which the NOC, account managers and finance do not hold. So Customers, companies, configuration
+items and purchase orders showed blank to them, and a search or a group-by through one was refused. The app's Allow-If
+ACLs on those tables, which the app's scope owns at install, add readers to the platform's. Provider staff read
+`customer_account` and its `name`, and no other field of an account; inventory techs among them, as they read Orders,
+Shipments and Returns of every Customer. The broad staff (`domain/roles` `BROAD_STAFF`) read `core_company`, `cmdb_ci`
+and `proc_po`. The service desk is given nothing new, and no staff role reads Customer Service's cases, which the app
+does not grant.
+
+Agreements and Lease schedules extend `ast_contract`, whose field ACLs let `contract_manager` read and search every
+field, and the service desk and Customer admins read a few. The platform decides a field at the most specific level
+that has an ACL for it, ORing that level's ACLs: the field on the table, then on each table it extends, then
+`*.<field>`, then `*` on the table and on each table it extends. So the app's field ACLs on the two tables, for read
+and for query_range (which a LIKE search needs), replace `ast_contract`'s: `*`, and each field `ast_contract` guards by
+name. Each names everyone who reads the field: the broad staff, and on Agreements the service desk too
+(`AGREEMENT_READERS`). An Agreement's number, short description, state, starts and ends also name Customer admins
+(`AGREEMENT_SUMMARY_READERS`): `ast_contract`'s CRM read ACLs for those fields admit `sn_esm_user`, which a Customer
+admin holds through Customer Service's `sn_customerservice.customer`. No other Agreement field, and no search of
+`starts`, was theirs before, and none is now. One that left a reader out would take the field from them: an Agreement
+`*` ACL naming finance alone, tried on the instance, took the currency, the Customer and the app's columns from the
+asset manager, and the first Agreement field ACLs, naming staff only, took those five fields from Customer admins. A
+build test holds each such ACL to every app role that reads the table's rows and read the field through
+`ast_contract`'s ACLs as recorded in `test-support/platform-acls.ts`.
+
 ## Consequences
 
 - Whether a record is left to the platform depends on the reader (an inventory tech's hardware outside the fleet, not
@@ -140,8 +184,15 @@ across levels. The app's own logic saves through GlideRecord, which no ACL check
   if it has `^NQ` clauses, carries the user's filter in each clause itself: it runs through `platform/visibility`
   `visibleQuery`, which ANDs the reader's `visibilityFilter` into each clause (the customer page's equipment, and
   the units a requested site decommission takes back, `platform/installed-assets` `visibleToReader`).
+- The app owns ACLs on `customer_account`, `core_company`, `cmdb_ci` and `proc_po`, global tables of other
+  applications, and field ACLs that stand in for `ast_contract`'s on its two contract tables. A platform upgrade that
+  changes who reads those tables, or `ast_contract`'s fields, is not seen by the build: the workspace's audience check
+  in `built-metadata.test.ts` judges the platform's tables by the ACLs recorded in
+  `src/server/test-support/platform-acls.ts`, which are re-recorded after such an upgrade (N50). A new field ACL
+  `ast_contract` gains by name decides that field for staff until the app adds one of its own.
 - What only an instance can confirm (a Deny-Unless ACL with no role and a module function as its script, on a parent
   table, applying to its child table's records; *Applies To* on `alm_asset`; the row check on a New form; the field
   ACLs on `alm_asset` applying to an `alm_asset` list's hardware rows; a create rule's script seeing the posted values
-  on a Table API insert) is checked in
+  on a Table API insert; the before-insert rules refusing a Customer contact's insert, through a record producer too;
+  the ACLs on platform tables and contract fields as installed) is checked in
   [docs/verify-on-instance.md](../verify-on-instance.md#access-and-visibility-adr-0005).

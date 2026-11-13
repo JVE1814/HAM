@@ -8,9 +8,10 @@ runner (`platform/chunked.ts`) walks a table one chunk at a time and is used in 
 
 - Scheduled, with the cursor in `x_daas_ham_job_cursor` (`runTableJob`): installed-base
   reconciliation (`reconcile_installed_base`), in-service detection (`in_service_detection`), raw
-  model normalization (`normalize_raw_models`), overdue return chasing (`chase_overdue_returns`) and
-  spare-pool top-up (`spare_pool_top_up`). A cursor save the platform refuses is logged, and the
-  next run repeats from the last saved cursor.
+  model normalization (`normalize_raw_models`), overdue return chasing (`chase_overdue_returns`),
+  the close of the Return orders no line keeps open (`close_done_returns`, a second pass of the
+  same daily job) and spare-pool top-up (`spare_pool_top_up`). A cursor save the platform refuses
+  is logged, and the next run repeats from the last saved cursor.
 - Event-driven, with the cursor in the event's `parm2` (`runEventTableJob`): the lifecycle phase
   and refresh date recalculation of a Model's, Agreement's or Lease's Assets (queued when the dates
   they are worked out from change, and by the daily lifecycle roll for the Models with a milestone
@@ -42,11 +43,16 @@ Other scheduled jobs do not use the runner. Each bounds its work its own way, or
   (the `x_daas_ham_job_cursor` row `oem_claim_stranded`, which holds only that position), starting
   over after the last.
 - Scheduled returns (`platform/scheduled-returns.ts` `raiseDueReturns`) take a limited number of ended
-  Agreements and of ending temporary Orders a run (the limits are in that module); each one raised
-  is flagged and drops out.
-- Attestations (`platform/attestations.ts` `raiseDueAttestations`) read every in-service or
-  temporarily deployed fleet asset of each active Agreement with an attestation interval, in one run
-  with no time budget or cursor.
+  Agreements and of ending temporary Orders a run (`PAGE` in that module), each in sys_id order
+  from where the last run stopped (the `x_daas_ham_job_cursor` rows `ended_agreement_returns` and
+  `temporary_order_returns`, which hold only that position), starting over after the last. Each
+  one raised is flagged and drops out. One left for a later run (a Return or its mark refused, an
+  Order still being installed) stays, and no longer keeps those after it from being read; a run
+  that reads a full page and leaves every record of it logs a warning.
+- Attestations (`platform/attestations.ts` `raiseDueAttestations`) read the Sites of each active
+  Agreement with an attestation interval with one count of its in-service or temporarily deployed
+  fleet assets grouped by Site, so no Asset row is read, then check each Site for an open
+  attestation and its last one, in one run with no time budget or cursor.
 - Lease review (`platform/leases.ts` `runLeaseReview`) reads every undecided lease that ended no
   longer ago than `REVIEWED_DAYS_PAST_END` (`domain/leases.ts`) or ends later, in one query; the
   renewal warnings read every Agreement not

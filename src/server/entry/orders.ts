@@ -6,6 +6,7 @@ import { onLineAssetMoved } from '../platform/fulfilment.ts'
 import type { NewLine } from '../platform/order-lines.ts'
 import {
     cancelOrder,
+    contactOrderInsertRefusal,
     rollUpOrderApprovals,
     submitOrder,
     submitProducedOrder,
@@ -13,6 +14,7 @@ import {
     type Submission,
 } from '../platform/orders.ts'
 import { str, type ForeignRecord } from '../platform/records.ts'
+import { abortWith } from '../platform/rule-api.ts'
 import { putBackUntransferred, runSourcingPass } from '../platform/sourcing.ts'
 import { sourcingRequestOf } from '../platform/sourcing-requests.ts'
 import { fellShortOfStagingCentre } from '../platform/transfers.ts'
@@ -27,17 +29,30 @@ interface DeviceRow {
  * (`current` is typed unknown because the SDK passes its own GlideRecord type here.)
  */
 export function afterOrderProduced(producer: Record<string, unknown>, current: unknown): void {
+    const order = current as GlideRecord
     const asked = deviceRows(producer.devices)
     const devices: NewLine[] = []
     for (const row of asked.rows) {
         if (row.model) devices.push({ modelId: String(row.model), quantity: Math.max(1, Number(row.quantity) || 1) })
     }
-    const order = current as GlideRecord
     const submission = submitProducedOrder(order, devices, asked.unread)
     if (submission.submitted || !submission.queued) return tellSubmission(submission)
     // Its raiser, often a Customer admin, has no Submit action to try again with.
     const saved = `Order ${str(order, 'number')} is saved and is submitted within a few minutes: another order of the same agreement was being submitted at that moment`
     gs.addInfoMessage(`${saved}. There is no need to raise it again`)
+}
+
+export function guardContactOrder(current: GlideRecord): void {
+    abortWith(current, contactOrderInsertRefusal(current))
+}
+
+/**
+ * Record producer script, run before the Order is inserted: a Customer contact's request is checked here, as the
+ * before-insert rule checks it. Refused by the rule, the platform still stores the producer's answers; refused here, it
+ * stores nothing (docs/research/external-contracts.md N48).
+ */
+export function beforeOrderProduced(_producer: Record<string, unknown>, current: unknown): void {
+    guardContactOrder(current as GlideRecord)
 }
 
 /**

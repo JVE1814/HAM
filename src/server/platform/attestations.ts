@@ -9,7 +9,7 @@ import { ACTIVE_AGREEMENTS } from './agreements.ts'
 import { customerAdminIds } from './approvals.ts'
 import { glideToIsoDate, nowGlide, todayIso } from './clock.ts'
 import { openException } from './exceptions.ts'
-import { bool, exists, findById, num, refusal, str, warnRefused } from './records.ts'
+import { bool, countBy, exists, findById, num, refusal, str, warnRefused } from './records.ts'
 import type { Sent } from './rest-api.ts'
 import { installedAssetIds } from './installed-assets.ts'
 import { withLock } from './locks.ts'
@@ -53,12 +53,10 @@ function raiseHolding(lock: HeldLock): void {
     agreement.addQuery('attestation_interval_months', '>', 0)
     agreement.query()
     while (agreement.next()) {
-        const sites = new Set<string>()
-        const asset = new GlideRecord('alm_hardware')
-        asset.addEncodedQuery(fleetStagesQuery(IN_USE_STAGES, `x_daas_ham_agreement=${agreement.getUniqueValue()}`))
-        asset.query()
-        while (asset.next()) if (str(asset, 'x_daas_ham_site')) sites.add(str(asset, 'x_daas_ham_site'))
-        for (const siteId of sites) {
+        // One grouped count gives the Sites, however many Assets each has: no Asset row is read.
+        const inUse = fleetStagesQuery(IN_USE_STAGES, `x_daas_ham_agreement=${agreement.getUniqueValue()}`)
+        for (const siteId of countBy('alm_hardware', inUse, 'x_daas_ham_site').keys()) {
+            if (!siteId) continue
             if (exists(ATTESTATION, `site=${siteId}^${OPEN_ATTESTATIONS}`)) continue
             const last = lastAttestedOn(siteId)
             if (!attestationDue({ lastAttestedOn: last, intervalMonths: num(agreement, 'attestation_interval_months'), today })) continue

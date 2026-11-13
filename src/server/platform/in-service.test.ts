@@ -137,6 +137,34 @@ describe('a seen event for a pending Asset', () => {
         expect(line()).toMatchObject({ status: 'active', start_date: '2025-11-09' })
     })
 
+    it('goes live from its first sighting since the install when its line could only be started at a later one', () => {
+        platform.refuses = (table, _row, operation) => (table === LINES && operation === 'update' ? 'line locked by finance' : '')
+        applyDeviceEvents([event()])
+
+        expect(asset()).toMatchObject({ ...stage('pending_in_service'), x_daas_ham_first_seen: SEEN })
+
+        platform.refuses = () => ''
+        expect(applyDeviceEvents([event({ observedAt: SEEN_MS + 86_400_000 })])).toEqual({ unknown: [], busy: [] })
+
+        expect(asset()).toMatchObject({
+            ...stage('in_service'),
+            x_daas_ham_first_seen: SEEN,
+            x_daas_ham_last_seen: '2025-11-10 09:00:00',
+            x_daas_ham_in_service_date: SEEN,
+            x_daas_ham_subscription_line: 'sub1',
+        })
+        expect(line()).toMatchObject({ status: 'active', start_date: '2025-11-09' })
+    })
+
+    it('goes live from the sighting since its install when it kept a first sighting from an earlier install', () => {
+        const earlier = '2025-11-01 09:00:00'
+        platform.tables[ASSETS] = [unit('pending_in_service', { x_daas_ham_first_seen: earlier, x_daas_ham_last_seen: earlier })]
+
+        applyDeviceEvents([event()])
+
+        expect(asset()).toMatchObject({ ...stage('in_service'), x_daas_ham_first_seen: SEEN, x_daas_ham_in_service_date: SEEN })
+    })
+
     it('is reported busy when its go-live save is refused, its line left active, and joins that line when sent again', () => {
         platform.refuses = (table, _row, operation) => (table === ASSETS && operation === 'update' ? 'stage rule said no' : '')
 
@@ -169,6 +197,7 @@ describe('a sighting of an Asset already in service', () => {
         applyDeviceEvents([event({ observedAt: SEEN_MS + 3_600_000 })])
 
         expect(asset()).toMatchObject({ ...stage('in_service'), x_daas_ham_last_seen: '2025-11-09 10:00:00', x_daas_ham_seen_source: 'nms', x_daas_ham_in_service_date: SEEN })
+        expect(asset().x_daas_ham_first_seen ?? '').toBe('')
         expect(line().start_date).toBe('2025-11-09')
     })
 
@@ -322,6 +351,28 @@ describe('the in-service detection job', () => {
         expect(rows(EVENTS)).toEqual([])
         expect(rows(LOCKS)).toEqual([])
         expect(rows(CURSORS)).toEqual([expect.objectContaining({ job: JOB.inServiceDetection, last_status: 'complete', processed_total: '1', failed_total: '0' })])
+    })
+
+    it('puts it in service from the first discovery since its install when its line could only be started after a later one', () => {
+        platform.refuses = (table, _row, operation) => (table === LINES && operation === 'update' ? 'line locked by finance' : '')
+        detectPendingInService()
+
+        expect(asset()).toMatchObject({ ...stage('pending_in_service'), x_daas_ham_first_seen: SEEN })
+
+        platform.refuses = () => ''
+        platform.tables.cmdb_ci = [discovered({ last_discovered: '2025-11-10 09:00:00' })]
+        detectPendingInService()
+
+        expect(asset()).toMatchObject({ ...stage('in_service'), x_daas_ham_last_seen: '2025-11-10 09:00:00', x_daas_ham_in_service_date: SEEN })
+        expect(line()).toMatchObject({ status: 'active', start_date: '2025-11-09' })
+    })
+
+    it('puts in service, from the sighting it kept, a pending Asset whose CI shows none', () => {
+        platform.tables[ASSETS] = [unit('pending_in_service', { ci: '', x_daas_ham_last_seen: SEEN, x_daas_ham_seen_source: 'nms' })]
+
+        detectPendingInService()
+
+        expect(asset()).toMatchObject({ ...stage('in_service'), x_daas_ham_in_service_date: SEEN, x_daas_ham_seen_source: 'nms' })
     })
 
     it('reads any other discovery source as a connector', () => {

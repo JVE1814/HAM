@@ -23,6 +23,10 @@ is never replaced, returned, refreshed, declared missing, charged for or dispose
   cancelled: a new Order then takes its place on the case. A form opened before the link can still send
   it: a linked draft is then submitted again, and a linked Order awaiting approval, going ahead or
   complete is kept (`domain/breakfix.ts`).
+  Two presses at once take turns under a job lock on the case (`LOCK.replacementCase` in
+  `domain/lock-names.ts`, ADR 0013): one that finds it held raises nothing and says *A replacement
+  is being raised for this case*, and each press reads the Order the case links afresh under the
+  lock, so a press that follows another keeps the Order that one linked.
 - Replacement lines skip the entitlement checks: a like-for-like swap is not a new catalog choice and
   adds no usage.
 - Sourcing follows the replacement priority: hot spare at the Site (in a customer-site stockroom
@@ -78,11 +82,31 @@ is never replaced, returned, refreshed, declared missing, charged for or dispose
 | Agreement end | Daily job, once per Agreement after its end date: one Return per Site for all equipment installed or still shipped there, each a field de-install with its own normal change and de-install work order; each Site's Return is raised once per end, so a run whose mark on the Agreement is refused (logged) raises nothing twice and saves the mark again |
 | Temporary end | Daily job, `x_daas_ham.returns.temporary_lead_days` before a temporary Order's end date; raised once per Order, and a refused mark is logged and saved again on the next run |
 
+- The daily job reads at most 50 ended Agreements and 50 ending temporary Orders a run, each in
+  sys_id order from where the last run stopped, and starts over after the last (ADR 0007). One it
+  leaves for a later run (a Return or its mark refused, an Order still being installed) does not
+  keep those after it from being read. A run that reads a full page and leaves every record of it
+  logs a warning.
+- The record producer is offered to those the Return create rule lets in only (its user criterion
+  *NaaS - Order and Return raisers*). The platform also makes it *Not available for: SNC External*,
+  which keeps every Customer admin out until an admin removes that row (README "Install").
 - Through the record producer, a return is raised only when the Return create rule lets its requester
   in (asset managers, account managers, NOC, the service desk and Customer admins): a Customer admin
   requests only for their own Customer, the others for any Customer, and site contacts never. The Site
-  must be one of the Customer's Sites. Otherwise the request is removed again and the requester is
-  told why (`domain/returns.ts` `returnRequestFindings`). The Site choices follow the chosen Customer.
+  must be one of the Customer's Sites. Otherwise the request is removed again (one the platform keeps
+  is logged, to cancel) and the requester is told why (`domain/returns.ts` `returnRequestFindings`).
+  Its answers to the producer's questions stay on the instance: the platform's `question_answer`
+  table lets no application delete from it. The Site choices follow the chosen Customer.
+- A Return order saved in a Customer contact's session is checked before it is saved, whatever
+  inserts it: it must name the contact's own Customer and one of that Customer's Sites, else it is
+  refused with *Return not raised* and the reason (`platform/returns.ts`
+  `contactReturnInsertRefusal`). A contact's insert by hand (a form, the Table API) keeps no posted
+  value, as they are an external user, so it names no Customer and is refused; the Site check
+  guards the record producer, the customer page and any other insert that keeps the values. The
+  record producer runs the check in its own script, before the insert (`entry/returns.ts`
+  `beforeReturnProduced`): refused there, the request stores none of its answers, which a refusal
+  by the before-insert rule would leave on the instance. The swap-back Return that a site contact's
+  install confirmation raises passes: it is for the Order's Customer and Site.
 - From the customer page, only a Customer admin limited to their own Customer requests returns
   (`domain/visibility.ts` `actsAsCustomerAdmin`), under the record producer's rule
   (`domain/returns.ts` `returnRequestFindings`). The API answers HTTP 403 when the Return create rule
@@ -182,6 +206,13 @@ is never replaced, returned, refreshed, declared missing, charged for or dispose
     the depot while its line could not be saved), is in a stage the lifecycle does not move to
     missing, or is not a fleet asset (a line raised before the Fleet flag), is not declared missing,
     and no move is tried. It is logged on each run, to settle by hand.
+  - after the chase, the same run closes each open Return order, created more than a day ago, that
+    no line keeps open (`platform/returns.ts` `closeDoneReturns`): one with no line at all
+    (inserted by hand, or raised with no unit when its close or its removal was refused), and one
+    whose lines are all evaluated or missing but whose close was refused then. It gets a work
+    note, and the close is logged. One created within the last day is left, as its lines may still
+    be added by hand. A close the platform refuses is logged as a warning and tried again by the
+    next run. The pass keeps a job cursor of its own (`close_done_returns`, ADR 0007).
 - Fees use the Agreement's lost / late / damage amounts. A zero amount records nothing. Each fee type
   is charged at most once per Asset and Return order (a waived fee aside), so a step retried after a
   refused save never charges twice. Two steps charging the same fee at once (two users saving one

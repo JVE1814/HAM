@@ -1,4 +1,5 @@
 import { gs, type GlideRecord } from '@servicenow/glide'
+import { endedLineProblem } from '../domain/billing.ts'
 import { agreementCurrencyProblem, currencyCode } from '../domain/money.ts'
 import { todayIso } from '../platform/clock.ts'
 import { warnExpiringCoverage } from '../platform/coverage-warnings.ts'
@@ -18,6 +19,10 @@ export function guardAgreementCurrency(current: GlideRecord): void {
     if (problem) return abortWith(current, problem)
     const code = currencyCode(entered)
     if (code && code !== entered) current.setValue('currency', code)
+}
+
+export function guardEndedSubscriptionLine(current: GlideRecord): void {
+    abortWith(current, endedLineProblem({ status: str(current, 'status'), endDate: str(current, 'end_date') }))
 }
 
 export function onAgreementTermsChanged(current: GlideRecord): void {

@@ -264,7 +264,7 @@ One charge of a Billing period, in its Agreement's currency: a Subscription line
 _Avoid_: invoice line
 
 **Service interval**:
-The days one Asset delivered a Subscription line, from the day it went in service to the day it left service.
+The days one Asset delivered a Subscription line at a Site, from the day it went in service or was moved there to the day it left service or was moved elsewhere.
 _Avoid_: usage, billable period
 
 **Cost fact**:

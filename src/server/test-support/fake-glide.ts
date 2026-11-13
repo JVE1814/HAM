@@ -19,7 +19,12 @@ import { compare, matchesQuery } from './encoded-query.ts'
  *   - `update` saves the fields changed since the record was read, does nothing when none was, and throws for a record
  *     that is not stored: on the platform that inserts one, which no code here means to do;
  *   - a refused insert, update or delete returns what the platform returns (null, false) and leaves the reason in
- *     `getLastErrorMessage`.
+ *     `getLastErrorMessage`;
+ *   - a record producer's `current` (`recordOf` with `produced`) refuses to delete itself, as on the platform; the same
+ *     row read afresh deletes;
+ *   - a record a script called `setAbortAction(true)` on is not written: its insert, update or delete is refused;
+ *   - `setValue` of a journal field (work_notes, comments) throws: the platform stores nothing for it. Assigning one
+ *     queues an entry that the next insert or update stores in `platform.journal`, even with no other field changed.
  * A Glide method the fake does not have fails the test with a TypeError: add it here, once, with the platform's
  * behaviour.
  */
@@ -35,6 +40,14 @@ export interface QueuedEvent {
     parm2: string
     /** Queued for later (gs.eventQueueScheduled) rather than now. */
     delayed: boolean
+}
+
+const JOURNAL_FIELDS = new Set(['work_notes', 'comments'])
+interface JournalEntry {
+    table: string
+    record: string
+    field: string
+    value: string
 }
 
 const UNIQUE_KEY_VIOLATION = 'Unique Key violation detected by database'
@@ -71,12 +84,16 @@ function state() {
         }) as (table: string) => boolean,
         /** Called with each row as it is inserted or updated, once nothing refused it and before it is stored. */
         onSave: (() => undefined) as (table: string, row: Row, operation: Exclude<Operation, 'delete'>) => void,
+        /** The journal entries saved (sys_journal_field), oldest first: a journal field reads blank on the record. */
+        journal: [] as JournalEntry[],
         events: [] as QueuedEvent[],
         /** What was logged, as `<level> <message>`. */
         logs: [] as string[],
         /** What the user was told (gs.addErrorMessage, gs.addInfoMessage), as `<error|info> <message>`. */
         messages: [] as string[],
         properties: {} as Record<string, string>,
+        /** The content of each attachment written (GlideSysAttachment#write), by the sys_id of its sys_attachment row. */
+        attachments: {} as Record<string, string>,
         /** The time now, in epoch ms. */
         clock: CLOCK_START,
         user: { id: '', name: '', company: '', roles: [] as string[], interactive: true },
@@ -88,6 +105,11 @@ export const platform = {
     ...state(),
     reset(): void {
         Object.assign(platform, state())
+    },
+    /** The work notes saved on a record, oldest first. */
+    notesOn(record: string | undefined): string[] {
+        if (!record) throw new Error('fake Glide: notesOn is asked of a record with no sys_id')
+        return platform.journal.filter((entry) => entry.record === record && entry.field === 'work_notes').map((entry) => entry.value)
     },
     get warnings(): string[] {
         return platform.logs.filter((line) => line.startsWith('warn ')).map((line) => line.slice('warn '.length))
@@ -210,7 +232,8 @@ class Conditions {
 
 class GlideRecord extends Conditions {
     private ordering: Array<{ field: string; descending: boolean }> = []
-    private limit = Infinity
+    /** The rows of the ordered result a query gives: from `first` up to, not including, `last`. */
+    private window = { first: 0, last: Infinity }
     private found: Row[] = []
     private at = -1
     private row: Row = {}
@@ -218,9 +241,13 @@ class GlideRecord extends Conditions {
     private read: Row | null = null
     private fresh = false
     private error = ''
+    private notes: Array<{ field: string; value: string }> = []
+    produced = false
+    private aborted = false
 
     hold(row: Row, fresh: boolean): this {
         this.row = { ...row }
+        this.notes = []
         this.read = fresh ? null : { ...row }
         this.fresh = fresh
         return this
@@ -232,8 +259,22 @@ class GlideRecord extends Conditions {
     orderByDesc(field: string): void {
         this.ordering.push({ field, descending: true })
     }
+    /** The platform's setLimit is chooseWindow(0, limit): whichever of the two is called last decides the rows. */
     setLimit(limit: number): void {
-        this.limit = limit
+        this.window = { first: 0, last: limit }
+    }
+    chooseWindow(first: number, last: number, _forceCount?: boolean): void {
+        this.window = { first, last }
+    }
+    /** An encoded query's `ORDERBY<field>` and `ORDERBYDESC<field>` terms order the rows, as orderBy and orderByDesc do. */
+    override addEncodedQuery(query: string): void {
+        const conditions: string[] = []
+        for (const term of query.split('^')) {
+            const order = /^ORDERBY(DESC)?(.+)$/.exec(term)
+            if (order) this.ordering.push({ field: order[2] ?? '', descending: order[1] !== undefined })
+            else conditions.push(term)
+        }
+        super.addEncodedQuery(conditions.join('^'))
     }
     setWorkflow(): void {}
 
@@ -242,7 +283,7 @@ class GlideRecord extends Conditions {
         for (const { field, descending } of [...this.ordering].reverse()) {
             found.sort((a, b) => compare(walk(this.table, a, field), walk(this.table, b, field)) * (descending ? -1 : 1))
         }
-        this.found = found.slice(0, this.limit)
+        this.found = found.slice(this.window.first, this.window.last)
         this.at = -1
     }
     hasNext(): boolean {
@@ -288,17 +329,32 @@ class GlideRecord extends Conditions {
         const referenced = target && value ? store(target).find((row) => row.sys_id === value) : undefined
         return referenced ? displayOf(referenced) : value
     }
+    set work_notes(value: string) {
+        this.notes.push({ field: 'work_notes', value: String(value) })
+    }
+    set comments(value: string) {
+        this.notes.push({ field: 'comments', value: String(value) })
+    }
+    private saveNotes(): void {
+        for (const note of this.notes) platform.journal.push({ table: this.table, record: this.getUniqueValue(), ...note })
+        this.notes = []
+    }
     setValue(field: string, value: unknown): void {
+        if (JOURNAL_FIELDS.has(field)) throw new Error(`fake Glide: setValue('${field}') on ${this.table} stores nothing on the platform: assign the journal field`)
         this.row[field] = value === null || value === undefined ? '' : String(value)
     }
     getLastErrorMessage(): string {
         return this.error
+    }
+    setAbortAction(abort: boolean): void {
+        this.aborted = abort
     }
     canCreate(): boolean {
         return platform.creatable(this.table)
     }
 
     private refusal(operation: Operation, stored: Row | undefined): string {
+        if (this.aborted) return 'aborted by a script'
         const others = store(this.table).filter((row) => row !== stored)
         if (operation !== 'delete') {
             const key = platform.uniqueKeys[rootOf(this.table)]
@@ -321,6 +377,7 @@ class GlideRecord extends Conditions {
         for (const [field, value] of Object.entries(platform.defaults[this.table]?.(this.row) ?? {})) this.row[field] ||= value
         platform.onSave(this.table, this.row, 'insert')
         store(this.table).push({ ...this.row })
+        this.saveNotes()
         this.hold(this.row, false)
         return this.row.sys_id
     }
@@ -333,7 +390,7 @@ class GlideRecord extends Conditions {
         const read = this.read ?? {}
         const sysId = this.stored().sys_id ?? null
         const changed = Object.keys(this.row).filter((field) => (this.row[field] ?? '') !== (read[field] ?? ''))
-        if (changed.length === 0) return sysId
+        if (changed.length === 0 && this.notes.length === 0) return sysId
         this.error = this.refusal('update', this.stored())
         if (this.error) return null
         this.row.sys_updated_on = stamp(platform.clock)
@@ -341,13 +398,14 @@ class GlideRecord extends Conditions {
         const stored = this.stored()
         for (const field of [...changed, 'sys_updated_on']) stored[field] = this.row[field] ?? ''
         this.read = { ...this.row }
+        this.saveNotes()
         return sysId
     }
     deleteRecord(): boolean {
         const rows = store(this.table)
         const at = rows.findIndex((row) => row.sys_id === this.row.sys_id)
         if (at < 0) return false
-        this.error = this.refusal('delete', rows[at])
+        this.error = this.produced ? `Error during delete of ${this.table} (${displayOf(this.row)})` : this.refusal('delete', rows[at])
         if (this.error) return false
         rows.splice(at, 1)
         return true
@@ -405,6 +463,25 @@ class GlideAggregate extends Conditions {
     }
 }
 
+/** Attachments are rows of sys_attachment, saved like any other; their content is kept in `platform.attachments`. */
+class GlideSysAttachment {
+    write(record: GlideRecord, fileName: string, contentType: string, content: string): string | null {
+        const attachment = new GlideRecord('sys_attachment')
+        attachment.initialize()
+        attachment.setValue('table_name', record.getTableName())
+        attachment.setValue('table_sys_id', record.getUniqueValue())
+        attachment.setValue('file_name', fileName)
+        attachment.setValue('content_type', contentType)
+        const id = attachment.insert()
+        if (id) platform.attachments[id] = content
+        return id
+    }
+    deleteAttachment(attachmentId: string): void {
+        const attachment = new GlideRecord('sys_attachment')
+        if (attachment.get(attachmentId) && attachment.deleteRecord()) delete platform.attachments[attachmentId]
+    }
+}
+
 class GlideDateTime {
     private ms: number
     constructor(value?: string) {
@@ -452,12 +529,15 @@ const gs = {
     isInteractive: () => platform.user.interactive,
 }
 
-export const glide = { GlideRecord, GlideAggregate, GlideDateTime, GlideTableHierarchy, gs }
+export const glide = { GlideRecord, GlideAggregate, GlideDateTime, GlideSysAttachment, GlideTableHierarchy, gs }
 
 /**
  * A record of `table` holding `row`, as a rule, an ACL or a script action is handed one: read from the table, or with
- * `fresh` a record not saved yet. The row need not be stored.
+ * `fresh` a record not saved yet, or with `produced` the `current` a record producer's scripts are handed. The row need
+ * not be stored.
  */
-export function recordOf<Record = unknown>(table: string, row: Row, options: { fresh?: boolean } = {}): Record {
-    return new GlideRecord(table).hold(row, options.fresh === true) as Record
+export function recordOf<Record = unknown>(table: string, row: Row, options: { fresh?: boolean; produced?: boolean } = {}): Record {
+    const record = new GlideRecord(table).hold(row, options.fresh === true)
+    record.produced = options.produced === true
+    return record as Record
 }

@@ -15,7 +15,7 @@ import {
 } from '../../server/entry/billing'
 import { generateNewPeriod } from '../../server/platform/billing'
 import { EVENT } from '../../server/domain/events'
-import { CURRENT_FLEET_STAGE_CHANGED } from '../../server/domain/fleet'
+import { CURRENT_IS_FLEET } from '../../server/domain/fleet'
 import { BILLING_PERIOD_STATUS } from '../../server/domain/vocabulary'
 import { RESET_AFTER_IDLE_MINUTES } from '../../server/domain/billing'
 import { admin, finance } from '../shared/roles.now'
@@ -169,6 +169,8 @@ BusinessRule({
     script: generateNewPeriod,
 })
 
+// A Service interval records the Asset's Subscription line and Site once, as it opens, so the rule runs on a change of
+// either as well as of the stage: a unit in service moved to another line or Site by hand has its interval moved.
 BusinessRule({
     $id: Now.ID['br_asset_left_service'],
     name: 'NaaS - start or stop billing on service',
@@ -176,7 +178,8 @@ BusinessRule({
     when: 'after',
     action: ['update'],
     order: 210,
-    condition: CURRENT_FLEET_STAGE_CHANGED,
+    condition:
+        `(current.install_status.changes() || current.substatus.changes() || current.x_daas_ham_subscription_line.changes() || current.x_daas_ham_site.changes()) && ${CURRENT_IS_FLEET}`,
     script: onAssetServiceChange,
 })
 

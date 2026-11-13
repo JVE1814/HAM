@@ -2,8 +2,10 @@ import '@servicenow/sdk/global'
 import { BusinessRule, EmailNotification, Property, Record, ScheduledScript, ScriptAction, UiAction } from '@servicenow/sdk/core'
 import { EVENT } from '../../server/domain/events'
 import { PROPERTY } from '../../server/domain/properties'
+import { SUBSCRIPTION_LINE_STATUS } from '../../server/domain/vocabulary'
 import {
     guardAgreementCurrency,
+    guardEndedSubscriptionLine,
     onAgreementTermsChanged,
     refreshAgreementAssets,
     uiRenewAgreement,
@@ -22,6 +24,18 @@ BusinessRule({
     order: 100,
     condition: 'current.currency.changes()',
     script: guardAgreementCurrency,
+})
+
+// Billing goes by a line's dates: an Ended line with no End date would be billed as still open.
+BusinessRule({
+    $id: Now.ID['br_subscription_line_ended'],
+    name: 'NaaS - ended line needs an end date',
+    table: 'x_daas_ham_subscription_line',
+    when: 'before',
+    action: ['insert', 'update'],
+    order: 100,
+    condition: `current.status == '${SUBSCRIPTION_LINE_STATUS.ended}' && current.end_date == ''`,
+    script: guardEndedSubscriptionLine,
 })
 
 BusinessRule({

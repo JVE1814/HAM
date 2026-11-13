@@ -46,7 +46,12 @@ label (*System Definition > Tables*) and its licensing row. A fresh install on a
 Run the on-demand job **NaaS - preflight check** (*System Definition > Scheduled Jobs*). Its row
 `preflight` in *NaaS Asset Management > Administration > Background jobs* reads *All prerequisites
 present*, as on the development instance on 2026-11-09. Otherwise it reads *N prerequisite(s)
-missing* and names them, each also logged as an error.
+missing* and names them, each also logged as an error. While `x_daas_ham.shipping.webhook_token`
+holds fewer than 32 characters it also reads *1 setting(s) to correct* and names that property, not
+its value; an empty token is not reported. Each record producer of the app that still has a *Not
+available for* row is a setting to correct too, named with its criterion: both, with *SNC
+External*, until an admin runs the script in README "Install"
+([customer creates](#customer-creates)).
 
 ### Choices
 
@@ -101,7 +106,9 @@ Confirm that *NaaS - the tracking webhook needs its token and records a delivery
 posts with the token are each answered HTTP 200 *delivered*: the route runs as guest, so this shows
 that `gs.getProperty` returns the scoped password2 token to guest despite its admin read role
 (external-contracts.md N45). Where `x_daas_ham.shipping.webhook_token` was empty before the run,
-confirm it is empty again after. The scripts spell out their modules' installed path, which names
+confirm it is empty again after. A configured token shorter than 32 characters fails this test with
+HTTP 401 on both posts and logs no warning for them; the preflight check names it. Set a longer
+one first (README "Upgrading"). The scripts spell out their modules' installed path, which names
 the version in `package.json`: after a build, `src/server/built-metadata.test.ts` fails when the
 version changes, until the paths are updated to match.
 
@@ -201,8 +208,10 @@ cursors* in the workspace) shows how each scheduled pass ended: a *Last status* 
 far*) means records failed; *Failed (this pass)* and *Last error* say how many and the last error,
 and each run logs them as an error in the system log. Some rows are no scheduled pass and read
 differently: `preflight` holds the preflight check's result, `billing_generate_<period sys_id>` a
-billing pass (ADR 0007), `provider_tag_sequence` the Provider tag counter, and `oem_claim_stranded`
-only where the OEM claim run's check for stranded steps goes on from, with no status.
+billing pass (ADR 0007), `provider_tag_sequence` the Provider tag counter, `oem_claim_stranded`
+only where the OEM claim run's check for stranded steps goes on from, and
+`ended_agreement_returns` and `temporary_order_returns` only where the daily job that raises
+agreement-end and temporary-end returns reads on from, each with no status.
 
 A generator for a dev instance and a timing protocol are drafted in
 [research/scale-test.md](research/scale-test.md), with the prototype in `tools/scale/`. Neither has
@@ -371,15 +380,70 @@ dispatcher of the Provider IT) gets no `x_daas_ham_labour_cost` from `GET
 /api/now/table/wm_order/<id>?sysparm_fields=number,x_daas_ham_labour_cost`. Closing the month's
 billing period afterwards still writes the *Field labour* Cost fact from the cost entered.
 
+### Platform tables staff read
+
+`shared/platform-access.now.ts`, `orders/access.now.ts`, `assurance/access.now.ts`,
+`agreements/access.now.ts`, `leases/access.now.ts` (external-contracts N50). After the install, the
+25 ACLs on `customer_account`, `customer_account.name`, `core_company`, `proc_po`, `cmdb_ci` and
+the fields of `x_daas_ham_agreement` and `x_daas_ham_lease_schedule` are in `x_daas_ham` scope.
+Impersonating a finance-only user, `GET
+/api/now/table/customer_account?sysparm_limit=1&sysparm_fields=name,phone` returns `name` and no
+`phone`, and `GET /api/now/table/x_daas_ham_agreement?sysparm_limit=1&sysparm_fields=number,customer,account_manager,state,currency,starts,ends`
+returns every field asked for. In the workspace, as a NOC-only user, a search on *All orders* for
+part of a Customer's name finds that Customer's Orders, and *Lines awaiting stock* shows its
+purchase orders. As finance, *Agreements* and *Lease schedules* show every column, and a search on
+either for part of a number or a contract number finds the record. As an inventory-tech-only user,
+*All orders* shows each Order's Customer. As a service desk agent with no NaaS role, an Agreement
+still shows its number, short description, state, starts and ends. As a Customer admin who holds
+`sn_customerservice.customer`, `GET /api/now/table/x_daas_ham_agreement?sysparm_fields=number,short_description,state,starts,ends,currency,customer`
+returns their Customer's Agreements with the first five fields and no currency or Customer, and the
+order producer's *Agreement* shows the Agreement's number. None of this was run on an
+instance from the build: the ACLs were made by hand there and the reads emulated.
+
 ### Customer creates
 
 `orders/access.now.ts`, `returns/access.now.ts`. As a customer admin, `POST /api/now/table/x_daas_ham_order` for another
 Customer and `POST /api/now/table/x_daas_ham_order_line` are refused; a `POST` of a Return order
-for another Customer is refused (this confirms the create rule sees the posted values); the
+for another Customer is refused (by the before-insert rule below, as the posted values are not
+kept, so this does not show whether the create rule sees them); the
 customer page's *Return selected* and the two record producers still work. As a service desk
 agent (`sn_customerservice_agent` only), the order producer offers the Customer's Agreements and
 Site templates, the generated Order opens with its lines and *Submit* goes ahead, and the return
-producer opens the Return it raised.
+producer opens the Return it raised. A Return they request through the producer for a Site of
+another Customer is refused and removed: no Return order of it stays open, and the system log has
+no *not removed* warning.
+
+Who opens the record producers (`shared/roles.now.ts` `producerRequesters`). After the install
+and the admin script of README "Install", each producer lists *Available for: NaaS - Order and
+Return raisers* and no *Not available for* row, and the script printed both with `removed`.
+Impersonating a customer admin, a service desk agent (`sn_customerservice_agent` only), a site
+contact and an internal user with no NaaS role, `GET
+/api/sn_sc/servicecatalog/items/<producer sys_id>` answers HTTP 200, 200, 400 and 400. On the
+development instance on 2026-11-12, a copy of a producer answered so with one criterion naming all
+five roles in its role list and *SNC External* removed (external-contracts N49). The app's
+criterion matches the service desk by name in its script instead, as that role's sys_id differs
+between instances: no instance has run that script yet, so the agent's HTTP 200 is the check of it.
+Before the admin script, the preflight check names both producers, and a customer admin gets HTTP
+400 for both.
+
+The before-insert rules (`returns/logic.now.ts`, `orders/logic.now.ts`). A customer admin is an
+external user (`snc_external`), and the platform's `*.*` create field ACL lets only internal users
+set a field on insert. So their insert by hand (the Table API, a form, an ATF *Record Insert* step
+run as them) keeps none of the posted values. On the development instance on 2026-11-12, `POST
+/api/now/table/x_daas_ham_return_order` as a customer admin, whatever it named, was refused as a
+Return with no Customer (*Return not raised. Choose the customer.*) and saved nothing, their own
+Customer and Site included; `POST /api/now/table/x_daas_ham_order` was refused by its create ACL. A
+hand insert never brings a Site or an Agreement to the rules. Those checks were shown by a
+background script that, impersonating the customer admin, inserted by `GlideRecord`, which keeps
+the values and checks no ACL but runs the rules: six such inserts of a Return or an Order that
+broke the rules were refused with *Return not raised. ...* or *Order not raised. ...* and the
+reason, and a Return and an Order of their own Customer and Site were saved. The ATF test *NaaS - customer returns: admins only, own sites only,
+a decommission takes the whole site* repeats it: an insert by hand with no Customer, then such
+`GlideRecord` inserts in the admin's session. Through each record producer, a request of theirs
+that names another Customer shows the refusal, opens no record and leaves no Order line behind, and
+`question_answer` gains no row. As
+a site contact, *Confirm installed* on a self-install Order that replaced a unit still raises the
+swap-back Return.
 
 ### REST access for customer users
 
@@ -394,15 +458,28 @@ authentication, ACL authorization and *Requires SNC Internal role* off. Imperson
 their Sites and racks. Impersonating *Sam Site (demo)*, both pages show only their Sites. As either
 user, `GET /api/x_daas_ham/naas/stockrooms` and `/billing_periods` answer HTTP 403.
 
+### Machine roles
+
+`shared/roles.now.ts`, `entry/billing.ts`. Also **after an upgrade**. As an internal user holding
+only `x_daas_ham.billing_reader`, `GET /api/x_daas_ham/naas/billing_periods` and
+`/billing_periods/<id>/lines` answer HTTP 200, and `POST /api/x_daas_ham/naas/device_events`
+answers HTTP 403 *Requires the x_daas_ham.integration role*. As an internal user holding only
+`x_daas_ham.integration`, both billing routes answer HTTP 403 *Requires the finance or billing
+reader role*, and a device-events batch is taken as before (HTTP 202). After an upgrade, the
+billing consumer's user holds `x_daas_ham.billing_reader` and no longer `x_daas_ham.integration`.
+
 ### NaaS Asset Workspace
 
 `x_daas_ham_workspace.do` (src/client/workspace). It opens for each NaaS staff role
 (`PROVIDER_STAFF` in `src/server/domain/roles.ts`) and for app administrators, and for no
 Customer contact (the page's ACL). Its sidebar offers a role only the lists of its audience
 (`catalog.ts`), and each list shows what the table's ACLs and before-query rules let the user
-read. As a NOC-only or inventory-tech-only user, Operations,
-Billing integrity and Lifecycle risk show counts and the Margin tab is not offered; an inventory
-tech is not offered the subscription-line and reconciliation-exception tiles. As finance, the Margin tab
+read. As a NOC-only user, Operations, Billing integrity and Lifecycle risk show counts and the
+Margin tab is not offered, nor the list *Unbilled fees*, whose Billing period column reads a money
+table; *Open fee events* shows the same fees. As an inventory-tech-only user, Operations and Lifecycle risk show
+counts, and neither Billing integrity (each of its tiles reads Subscription lines) nor Margin is
+offered; the tech is not offered the reconciliation-exception tiles, nor the list *Data gaps (no
+tag, serial, agreement or site)*, whose filter reads the Agreement. As finance, the Margin tab
 shows figures, each in its own currency. As a non-admin staff user, *Overdue returns*, *Agreements
 up for renewal* and the Margin tiles (`javascript:gs.…` dates in the query) and *My staging tasks*
 (`assigned_toDYNAMIC`) show rows, and every list has its column labels (`/api/now/ui/meta`).
@@ -650,8 +727,10 @@ A go-live starts a pending Subscription line under `subscription_line_<line sys_
 that name in *Job lock*, a *seen* event for an Asset going live on that line is accepted. The Asset
 stays pending in service, two *Unique Key violation* errors a try are logged, and so is *[x_daas_ham]
 <serial> stays pending in service, line not started: another go-live held its lock through every
-try* (warning). Delete the row, or leave it until it is abandoned, and the next sighting starts the
-line.
+try* (warning). The Asset's *First seen since install* (`x_daas_ham_first_seen`, added to a list
+of Assets by hand) holds the time of that event. Delete the row, or leave it until it is
+abandoned, and the next sighting starts the line: the Asset's *In-service date* and the line's
+start date are those of the first event, not of the later sighting.
 
 ### Fee event and service interval locks
 
@@ -690,6 +769,14 @@ lock*, *Execute now* on its job does nothing. It logs two *Unique Key violation*
 *Attestations not raised: another run holds the attestation_run lock and raises them* or *Overdue
 returns not chased: another run holds the overdue_returns_run lock and chases them* (info). Delete
 the row and the next run does the work.
+
+### Replacement lock
+
+*Raise replacement* on a case ([how a job lock behaves](#how-a-job-lock-behaves)). The press raises,
+links and submits the replacement Order under the job lock `replacement_case_<case sys_id>`. With
+a row of that name in *Job lock*, *Raise replacement* on that case raises no Order. It logs two
+*Unique Key violation* errors and shows *A replacement is being raised for this case. Reload the
+case to see its Order*. Delete the row and the next press raises the Order.
 
 ### Spare-pool lock
 
@@ -808,6 +895,55 @@ units then ends it.
   damage fee could be charged twice when an evaluation was chosen again after the lifecycle refused
   the move: list Fee events (not waived) that share type, Asset and Return order, and waive the
   duplicates.
+
+### Subscription line or Site changed in service
+
+As an asset manager, open a fleet asset in service that has an open Service interval, and change
+its *Subscription line* to another line of its Agreement. The open interval gets today as its *Last
+day*, and a new interval on the new line and the Asset's Site is created with tomorrow as its
+*First day*. Change the line back the same day: the new interval is gone and the first one is open
+again. Clear the line: the open interval ends today and none is created. Change the *Site* of a
+unit in service: its interval moves the same way. With a row named `service_interval_<Asset
+sys_id>` in *Job lock* ([how a job lock behaves](#how-a-job-lock-behaves)), the same change leaves
+the interval where it was and logs *[x_daas_ham] <serial> changed its Subscription line or Site on
+<date>, its Service interval not moved: ...* (error).
+
+**After an upgrade:** a unit whose line or Site was changed in service before this release still
+has its open interval on the old one. List open Service intervals (*Last day* empty) whose
+*Subscription line* or *Site* differs from their Asset's. For each, set its *Last day* and create
+the interval at the line and Site the Asset has now. List fleet assets in service that have a
+Subscription line and no open Service interval, and create theirs.
+
+### Ended subscription lines
+
+Open an active Subscription line, set *Status* to *Ended* with *End date* empty, and save. The save
+is refused with *An Ended subscription line needs an End date, the last day it is billed: enter it
+(today, if the line ends now)*, and the line keeps its status. Enter an End date and save: it is
+written. Clear the End date of an Ended line and save: it is refused the same way. A list edit is
+refused too.
+
+**After an upgrade:** a line set *Ended* without an End date before this release is still billed
+every month, and the rule refuses its next save until it has one. List Subscription lines with
+*Status* *Ended* and an empty *End date* (`status=ended^end_dateISEMPTY`), and give each the last
+day it should be billed. The workspace counts them on the *Billing integrity* tab, tile *Ended
+lines without an end date*, and lists them under *Commercial*. A Billing period still *Ready for review* that billed such a line past
+that day is put right with *Regenerate*. A closed period is not changed: credit it by hand.
+
+### Service interval not yet started
+
+As a user who is not an admin, take a fleet asset in service that has an open Service interval out
+of service (declare it missing): the interval gets today as its *Last day*. Put it back in service
+the same day at another *Site* (a Seen signal, or its stage set by hand): a new interval is
+created with tomorrow as its *First day*. Take it out of service again the same day: the new
+interval is gone, and the first one still ends today. No interval of the Asset is left with a
+*First day* after today. The rule deletes the interval in the save of that user, as it creates and
+ends one. If the platform refuses the delete, the interval stays open and the log has
+*[x_daas_ham] <serial> left service on <date>, its Service interval did not close: ...* (warning):
+an admin deletes it by hand.
+
+**After an upgrade:** an interval closed this way before this release has one day, the day after
+its Asset's interval before it ended, and bills that day. Nothing tells it from the interval of a
+unit that was in service for one day, so none is removed.
 
 ### Replacement SLA stop
 

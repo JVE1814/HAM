@@ -33,12 +33,12 @@ each line points at the place that explains it. Use the words of `CONTEXT.md` in
   `fluent-overview` first.
 - The name of a rule, UI action, script action, notification, SLA, REST message or route fits 40
   characters.
+- A work note is added with `addWorkNote` (`src/server/platform/records.ts`): `setValue` on `work_notes`
+  or `comments` stores nothing on the instance (`docs/research/external-contracts.md` N46).
 - A stored choice value is defined once, in `src/server/domain/vocabulary.ts`.
 - A lock name goes in `src/server/domain/lock-names.ts`, in the order ADR 0013 gives.
 - A test is a `*.test.ts` file beside its module. A test of `platform/` or `entry/` runs against
   `src/server/test-support/fake-glide.ts`, which runs no business rule, ACL or flow.
-- `npm run build` type-checks `src/client/**/*.test.ts` with the libs of `src/client/tsconfig.json`,
-  which have no `DOM.Iterable`. A client test can pass `npm run typecheck` and still fail the build.
 - Lint skips what git ignores, so keep scratch files in a git-ignored folder (`.git/info/exclude`).
 
 ## Where things are

@@ -18,6 +18,11 @@ export const LOCK = {
     /** Held by the daily refresh run from its read of the Assets due to its last Order. */
     refreshOrders: () => named('refresh_orders'),
     /**
+     * Raise replacement on a case reads the Order the case links, raises one, links it and submits it under it, so two
+     * presses at once never raise an Order each.
+     */
+    replacementCase: (caseId: string) => named(`replacement_case_${caseId}`),
+    /**
      * An Agreement's submissions take turns under it: each reads the Agreement's usage, assesses its Order and saves it
      * out of draft, which makes it count in flight, before the next reads. Two read at once would each miss the other
      * and could both go ahead within a Contracted quantity only one fits.
@@ -86,7 +91,7 @@ export const LOCK = {
     reconException: (type: ExceptionType, subjectId: string) => named(`recon_exception_${type}_${subjectId}`),
     /** A pending Subscription line is started under it: nothing is taken under it. */
     subscriptionLine: (lineId: string) => named(`subscription_line_${lineId}`),
-    /** The open and the close of an Asset's Service interval take turns under it. */
+    /** The open, the close and the move of an Asset's Service interval take turns under it. */
     serviceInterval: (assetId: string) => named(`service_interval_${assetId}`),
     /**
      * A Billing period's Close and Regenerate take turns under it, each reading its status afresh, and a fee's waiver

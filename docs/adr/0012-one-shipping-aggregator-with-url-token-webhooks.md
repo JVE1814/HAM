@@ -7,5 +7,6 @@ webhook endpoint has no platform login because aggregators cannot send ServiceNo
 authenticated by a shared token that both ShipEngine (webhook `headers`) and EasyPost
 (`custom_headers`) can send as the custom header `X-NaaS-Webhook-Token`, with a URL query
 (`?token=`) as the fallback (undocumented by both vendors). The token is compared in constant time
-and everything is refused while the token property is empty. Manual tracking numbers
+and everything is refused while the token property is empty or holds fewer than 32 characters.
+Manual tracking numbers
 remain possible when the aggregator is off.

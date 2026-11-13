@@ -20,6 +20,17 @@ export function findById(table: string, sysId: string, options: ReadOptions = {}
     return found ? gr : null
 }
 
+/**
+ * Delete the stored row `record` holds, read again by its sys_id past the app's visibility rules: why the platform kept
+ * it, or '' once it is gone. A record producer's `current` cannot delete itself; the row read again can
+ * (docs/research/external-contracts.md N47).
+ */
+export function removeStored(record: GlideRecord): string {
+    const stored = findById(record.getTableName(), record.getUniqueValue(), { beyondVisibility: true })
+    if (!stored || stored.deleteRecord()) return ''
+    return refusal(stored, 'the delete was refused')
+}
+
 export function pluck(table: string, encodedQuery: string, field: string, limit = 10000): string[] {
     const gr = new GlideRecord(table)
     gr.addEncodedQuery(encodedQuery)
@@ -154,6 +165,11 @@ function valueOf(gr: ForeignRecord, field: string): string | null {
     if (!field.includes('.')) return gr.getValue(field)
     const element: GlideElement | null = gr.getElement(field)
     return element ? element.getValue() : null
+}
+
+/** Assigned, not setValue, which stores nothing for a journal field; the GlideRecord types do not allow the assignment. */
+export function addWorkNote(record: ForeignRecord, note: string): void {
+    ;(record as unknown as { work_notes: string }).work_notes = note
 }
 
 export function str(gr: ForeignRecord, field: string): string {

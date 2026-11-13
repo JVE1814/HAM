@@ -61,6 +61,7 @@ export const alm_hardware = Table({
         x_daas_ham_install_completed: DateTimeColumn({ label: 'Install completed' }),
         x_daas_ham_in_service_date: DateTimeColumn({ label: 'In-service date', readOnly: true }),
         x_daas_ham_last_seen: DateTimeColumn({ label: 'Last seen', readOnly: true }),
+        x_daas_ham_first_seen: DateTimeColumn({ label: 'First seen since install', readOnly: true }),
         x_daas_ham_seen_source: ChoiceColumn({
             label: 'Seen source',
             readOnly: true,

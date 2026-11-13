@@ -3,6 +3,7 @@ import { activeDays, currencyKey, divideRounded, fromCents, isMonth, previousMon
 import { FLEET_CONDITION, fleetStagesQuery } from './fleet.ts'
 import { DEPLOYED_STAGES } from './lifecycle.ts'
 import { BILLING_PERIOD_STATUS, STAGE_FIELDS, SUBSCRIPTION_LINE_STATUS, SUBSCRIPTION_LINE_TYPE } from './vocabulary.ts'
+import { ROLE, type AppRole } from './roles.ts'
 
 /**
  * Why a Billing period cannot be saved for `month` on `today`, or null. The month must be YYYY-MM and over: a new
@@ -38,12 +39,17 @@ export interface ServiceInterval {
     count?: number
 }
 
-/** The last day (inclusive) of a Service interval that started on `start` and is closed on `closedOn`: never before it started. */
-export function intervalEnd(start: string, closedOn: string): string {
-    return closedOn < start ? start : closedOn
+/**
+ * The last day (inclusive) of a Service interval that started on `start` and is closed on `closedOn`, or null for one
+ * that starts later (the day after an interval elsewhere ended, restartInterval): it delivered no day, so it is removed
+ * and not ended, which would bill its first day.
+ */
+export function intervalEnd(start: string, closedOn: string): string | null {
+    return closedOn < start ? null : closedOn
 }
 
-interface IntervalPlace {
+/** Where an Asset in service is billed: the Subscription line it delivers ('' for none) and its Site. A Service interval records both once, as it opens. */
+export interface IntervalPlace {
     lineId: string
     siteId: string
 }
@@ -99,13 +105,26 @@ function withinLine(interval: DayRange, line: Partial<DayRange>): DayRange | nul
     return end !== undefined && end < start ? null : { start, end }
 }
 
+/**
+ * Why a Subscription line cannot be saved as it is, or null: one set Ended needs its End date. Billing goes by a
+ * line's dates and takes one without an End date as still open, whatever its status, so an Ended line without one
+ * would be billed every month. The End date is the last day billed, which only whoever ends the line knows, so none
+ * is filled in for them.
+ */
+export function endedLineProblem(line: { status: string; endDate: string }): string | null {
+    if (line.status !== SUBSCRIPTION_LINE_STATUS.ended || line.endDate) return null
+    return 'An Ended subscription line needs an End date, the last day it is billed: enter it (today, if the line ends now)'
+}
+
 const NO_LINE = 'x_daas_ham_subscription_lineISEMPTY'
 
 /**
- * Encoded query on alm_hardware for the Billing integrity dashboard: fleet assets in service on no Subscription line,
- * which nothing bills. `fleetStagesQuery(['in_service'], NO_LINE)` written out for the tile to import.
+ * Encoded query on alm_hardware for the Billing integrity dashboard: fleet assets (ADR 0016) in a billed stage on no
+ * Subscription line, which nothing bills. Go-live attaches a unit to none when no open line of its Agreement matches
+ * it (platform/subscriptions), on a temporary deployment as in service. It is
+ * `fleetStagesQuery(IN_USE_STAGES, NO_LINE)` written out, one clause per stage in use, as IN_SERVICE_ON_ENDED_LINE is.
  */
-export const IN_SERVICE_UNBILLED = `install_status=${STAGE_FIELDS.in_service.installStatus}^substatusISEMPTY^${NO_LINE}^${FLEET_CONDITION}`
+export const IN_SERVICE_UNBILLED = `install_status=${STAGE_FIELDS.in_service.installStatus}^substatusISEMPTY^${NO_LINE}^${FLEET_CONDITION}^NQinstall_status=${STAGE_FIELDS.temporary_deployment.installStatus}^substatus=${STAGE_FIELDS.temporary_deployment.substatus}^${NO_LINE}^${FLEET_CONDITION}`
 
 const ON_ENDED_LINE = `x_daas_ham_subscription_line.status=${SUBSCRIPTION_LINE_STATUS.ended}^ORx_daas_ham_subscription_line.end_date<javascript:gs.beginningOfToday()`
 
@@ -117,6 +136,23 @@ const ON_ENDED_LINE = `x_daas_ham_subscription_line.status=${SUBSCRIPTION_LINE_S
  * imports it, and Fluent metadata reads no function call (domain/billing.test.ts checks which Assets it flags).
  */
 export const IN_SERVICE_ON_ENDED_LINE = `install_status=${STAGE_FIELDS.in_service.installStatus}^substatusISEMPTY^${ON_ENDED_LINE}^${FLEET_CONDITION}^NQinstall_status=${STAGE_FIELDS.temporary_deployment.installStatus}^substatus=${STAGE_FIELDS.temporary_deployment.substatus}^${ON_ENDED_LINE}^${FLEET_CONDITION}`
+
+const ON_PENDING_LINE = `x_daas_ham_subscription_line.status=${SUBSCRIPTION_LINE_STATUS.pending}`
+
+/**
+ * Encoded query on alm_hardware for the Billing integrity dashboard: fleet assets (ADR 0016) in a billed stage whose
+ * Subscription line is still pending. Generation bills no pending line, so nothing bills them. Go-live starts a pending
+ * line as it attaches a unit (platform/subscriptions), so only a line set on the Asset by hand leaves one here. It is
+ * `fleetStagesQuery(IN_USE_STAGES, ON_PENDING_LINE)` written out, as IN_SERVICE_ON_ENDED_LINE is.
+ */
+export const IN_SERVICE_ON_PENDING_LINE = `install_status=${STAGE_FIELDS.in_service.installStatus}^substatusISEMPTY^${ON_PENDING_LINE}^${FLEET_CONDITION}^NQinstall_status=${STAGE_FIELDS.temporary_deployment.installStatus}^substatus=${STAGE_FIELDS.temporary_deployment.substatus}^${ON_PENDING_LINE}^${FLEET_CONDITION}`
+
+/**
+ * Encoded query on x_daas_ham_subscription_line for the Billing integrity dashboard: the lines endedLineProblem
+ * refuses, saved before its rule or past it. Billing takes each as still open and bills it every month until it is
+ * given its End date.
+ */
+export const ENDED_LINES_WITHOUT_END_DATE = `status=${SUBSCRIPTION_LINE_STATUS.ended}^end_dateISEMPTY`
 
 /**
  * The Assets that keep a site package open, as an encoded alm_hardware query: the fleet assets (ADR 0016) at its Site
@@ -298,6 +334,13 @@ export function billingLineJson(id: string, line: StoredBillingLine): { [key: st
     }
     return json
 }
+
+/**
+ * Who pulls Billing periods and their lines through the pull API: finance, and the billing consumer (an ERP), whose
+ * machine role reads them and grants nothing else. Not the NMS's role (domain/device-events `DEVICE_EVENT_SENDERS`):
+ * a credential that posts device events reads no Customer's bill, and one that reads bills posts no sighting.
+ */
+export const BILLING_PULL_READERS: readonly AppRole[] = [ROLE.finance, ROLE.billingReader]
 
 export const PULL_PAGE = {
     periods: { size: 24, most: 120 },

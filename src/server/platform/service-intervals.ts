@@ -1,5 +1,5 @@
 import { GlideRecord } from '@servicenow/glide'
-import { intervalEnd, restartInterval } from '../domain/billing.ts'
+import { intervalEnd, restartInterval, type IntervalPlace } from '../domain/billing.ts'
 import type { HeldLock } from '../domain/job-lock.ts'
 import { isBillable } from '../domain/lifecycle.ts'
 import { LOCK } from '../domain/lock-names.ts'
@@ -112,7 +112,8 @@ function inServiceNow(assetId: string): boolean {
 }
 
 /**
- * Stop billing an Asset: its open intervals end on `endIso` (inclusive). It takes turns with the open under the Asset's
+ * Stop billing an Asset: its open intervals end on `endIso` (inclusive), and one that starts later, which delivered no
+ * day, is removed (leaveInterval). It takes turns with the open under the Asset's
  * interval lock (see openServiceInterval) and closes only while the Asset, read afresh there, is still out of service:
  * one a later save put back in service keeps its interval, which that save's open then finds open. A save that finds
  * the lock held tries again, then leaves the close to the holder; an interval still open for an Asset out of service
@@ -140,8 +141,7 @@ function closeHolding(lock: HeldLock, assetId: string, endIso: string): void {
     let closed = ''
     while (interval.next()) {
         const serial = str(interval, 'asset.serial_number')
-        interval.setValue('end_date', intervalEnd(str(interval, 'start_date'), endIso))
-        if (interval.update()) {
+        if (leaveInterval(interval, endIso)) {
             closed = serial
             continue
         }
@@ -149,6 +149,83 @@ function closeHolding(lock: HeldLock, assetId: string, endIso: string): void {
     }
     // The save that took a lost lock over may have put the Asset back in service and found the interval still open.
     if (closed) lock.lostAfter(`${closed} interval closed`, { check: "check it matches the Asset's stage", level: 'error' })
+}
+
+/**
+ * Move the billing of an Asset in service to the Subscription line and Site it has now, after a save that changed
+ * either and left it in service: an interval records both once, as it opens, so the open one names the old ones. The
+ * interval at the old place ends on `todayIso`, which it bills as any last day, and the one at the new place starts the
+ * day after (restartInterval), so no day is billed twice; an Asset that had no interval open starts on `todayIso`, and
+ * one left without a line gets none. Under the Asset's interval lock, with the Asset read afresh there, so two such
+ * saves at once leave the interval where the later one put the Asset, whichever runs last. A save that finds the lock
+ * held tries again, then leaves the move to the holder; an interval still elsewhere when it gives up is logged as an
+ * error, to move by hand.
+ */
+export function moveServiceInterval(assetId: string, todayIso: string): void {
+    const why = underIntervalLock(assetId, (lock) => moveHolding(lock, assetId, todayIso))
+    if (why === null) return
+    const asset = findById('alm_hardware', assetId, { beyondVisibility: true })
+    if (!asset || !isBillable(readStage(asset)) || billedAt(assetId, placeOf(asset))) return
+    const unmoved = `${str(asset, 'serial_number')} changed its Subscription line or Site on ${todayIso}, its Service interval not moved`
+    log.error(`${unmoved}: ${why}; move it by hand if it is still on the old one`)
+}
+
+function placeOf(asset: ForeignRecord): IntervalPlace {
+    return { lineId: str(asset, 'x_daas_ham_subscription_line'), siteId: str(asset, 'x_daas_ham_site') }
+}
+
+function isAt(interval: GlideRecord, place: IntervalPlace): boolean {
+    return str(interval, 'subscription_line') === place.lineId && str(interval, 'site') === place.siteId
+}
+
+/** Whether the Asset's open intervals are what `place` asks for: one there when it names a line, and none elsewhere. */
+function billedAt(assetId: string, place: IntervalPlace): boolean {
+    const interval = openIntervals(assetId)
+    let there = false
+    while (interval.next()) {
+        if (!isAt(interval, place)) return false
+        there = true
+    }
+    return there || !place.lineId
+}
+
+/**
+ * Move the open interval holding `lock`. An Asset out of service by now has what is open closed, as the close of the
+ * save that took it out would. An interval the platform refuses to end stays open and none is opened beside it, which
+ * would bill the Asset twice.
+ */
+function moveHolding(lock: HeldLock, assetId: string, todayIso: string): void {
+    const asset = findById('alm_hardware', assetId, { beyondVisibility: true })
+    if (!asset || !isBillable(readStage(asset))) return closeHolding(lock, assetId, todayIso)
+    const place = placeOf(asset)
+    const serial = str(asset, 'serial_number')
+    const interval = openIntervals(assetId)
+    let there = false
+    let left = false
+    while (interval.next()) {
+        if (isAt(interval, place)) {
+            there = true
+            continue
+        }
+        if (!lock.held()) return
+        if (!leaveInterval(interval, todayIso)) return void warnRefused(interval, `${serial} changed its Subscription line or Site on ${todayIso}, its Service interval not moved`)
+        left = true
+    }
+    // The save that took a lost lock over may have moved the interval too.
+    if (left && lock.lostAfter(`${serial} interval ended at its old line or Site`, { check: 'check only one is open, at the line and Site the Asset has', level: 'error' })) return
+    if (!there && place.lineId) openInterval(lock, asset, place.lineId, todayIso)
+}
+
+/**
+ * End the open `interval` on `lastIso` for an Asset that left service or moved elsewhere: false when the platform
+ * refuses. One that starts later (the day after an interval elsewhere ended that day) has delivered no day and is
+ * deleted (intervalEnd), so the Asset goes on from the interval before it.
+ */
+function leaveInterval(interval: GlideRecord, lastIso: string): boolean {
+    const end = intervalEnd(str(interval, 'start_date'), lastIso)
+    if (end === null) return interval.deleteRecord()
+    interval.setValue('end_date', end)
+    return Boolean(interval.update())
 }
 
 function openIntervals(assetId: string): GlideRecord {

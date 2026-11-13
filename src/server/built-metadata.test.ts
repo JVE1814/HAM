@@ -20,6 +20,8 @@ import { buyLabel, labelVoidable, SHIPPING_MESSAGE } from './domain/shipping'
 import { stagingClosing } from './domain/staging'
 import { SCOPED_TABLES, type TableScoping } from './domain/visibility'
 import {
+    AGREEMENT_READERS,
+    AGREEMENT_SUMMARY_READERS,
     BROAD_STAFF,
     MONEY_READERS as MONEY_READERS_IN_ORDER,
     PLATFORM_ROLE,
@@ -56,6 +58,7 @@ import { giveToLessor } from './platform/leases'
 import { PROPERTY, type PropertyOf } from './domain/properties'
 import type { ForeignRecord } from './platform/records'
 import { restMessagePort } from './platform/rest-messages'
+import { EXTERNAL, HELD_WITH, PLATFORM_ROLE_CONTAINS, PLATFORM_TABLES, PUBLIC, PUBLIC_QUERY_RANGE_FIELDS, SIGNED_IN } from './test-support/platform-acls'
 import { AUDIENCE, CATEGORIES } from '../client/workspace/catalog'
 import { DASHBOARD, widgetAudience } from '../client/workspace/dashboard'
 
@@ -140,7 +143,8 @@ const unescapeXml = (text: string) =>
 
 /**
  * One built record: the table it is a record of (`$table`), and each of its fields as the instance stores it ('' for an
- * empty one). A reference built with the name of what it points at has that under `<field>.name`.
+ * empty one). A reference built with the name of what it points at has that under `<field>.name`, and one built with
+ * what it shows under `<field>.display_value`.
  */
 interface BuiltRecord {
     $table: string
@@ -157,9 +161,11 @@ function builtRecords(): BuiltRecord[] {
         const record: BuiltRecord = { $table: table }
         for (const [, field = '', attributes = '', value] of xml.matchAll(/^ {4}<(\w+)((?: [^>]*)?)(?:\/>|>([\s\S]*?)<\/\1>)$/gm)) {
             record[field] = unescapeXml(value ?? '')
-            // A reference is built as the record's id, with what it names beside it.
+            // A reference is built as the record's id, with what it names or shows beside it.
             const named = / name="([^"]*)"/.exec(attributes)?.[1]
             if (named !== undefined) record[`${field}.name`] = unescapeXml(named)
+            const shownAs = / display_value="([^"]*)"/.exec(attributes)?.[1]
+            if (shownAs !== undefined) record[`${field}.display_value`] = unescapeXml(shownAs)
         }
         return [record]
     })
@@ -272,7 +278,7 @@ function andTerms(condition: string): string[] {
 }
 
 describe('scripts wired to server modules', () => {
-    const SCRIPTED = ['sys_script', 'sys_ui_action', 'sysevent_script_action', 'sysauto_script', 'sys_ws_operation', 'sys_security_acl']
+    const SCRIPTED = ['sys_script', 'sys_ui_action', 'sysevent_script_action', 'sysauto_script', 'sys_ws_operation', 'sys_security_acl', 'sc_cat_item_producer']
     const SCRIPT_FIELDS = ['script', 'operation_script', 'post_insert_script']
     const calls = () =>
         SCRIPTED.flatMap((table) => records(table)).flatMap((record) =>
@@ -287,7 +293,7 @@ describe('scripts wired to server modules', () => {
      * `sourceOrder(event, current)`), so they must be the globals the platform provides to that script.
      */
     it('call each entry point with the globals the platform provides', () => {
-        const PLATFORM_GLOBALS = new Set(['current', 'previous', 'event', 'producer', 'request', 'response'])
+        const PLATFORM_GLOBALS = new Set(['current', 'previous', 'event', 'producer', 'cat_item', 'request', 'response'])
         const found = calls()
         expect(found.length).toBeGreaterThan(100)
         const unknown = found.flatMap(({ record, fn, call }) =>
@@ -606,6 +612,36 @@ describe('fields the forms, lists and record producers name', () => {
             .map(({ where, table, field }) => `${where}: ${table}.${field}`)
         expect(missing).toEqual([])
     })
+
+    /*
+     * The scale scripts (tools/scale) are pasted into Scripts - Background and are no part of the build. They name
+     * their fields as texts too. The dry run records each one, with the value set, while it runs both scripts.
+     */
+    it('are columns and choices in the scale scripts too, which the dry run runs', async () => {
+        const { scaleScriptNames } = await import('../../tools/scale/dry-run.mjs')
+        const { named, stages } = scaleScriptNames()
+        const choicesOf = (table: string, column: string): string[] | undefined => {
+            const path = join(BUILT, 'dictionary', `${table}.xml`)
+            if (!existsSync(path)) return undefined
+            const choices = new RegExp(`<element name="${column}" [^>]*>\\s*<choice>([\\s\\S]*?)</choice>`).exec(readFileSync(path, 'utf8'))?.[1]
+            return choices === undefined ? undefined : [...choices.matchAll(/<element value="([^"]*)"/g)].map(([, value = '']) => value)
+        }
+        /** The platform tables the scripts name that the SDK ships no definition of: what each extends, and its own columns named. */
+        const UNDEFINED: Readonly<Record<string, { parent: string; columns: readonly string[] }>> = {
+            customer_account: { parent: 'core_company', columns: ['number'] },
+            cmdb_hardware_product_model: { parent: 'cmdb_model', columns: [] },
+        }
+        const known = (table: string, column: string) =>
+            hasColumn(table, column) || Boolean(UNDEFINED[table]?.columns.includes(column) || hasColumn(UNDEFINED[table]?.parent ?? '', column))
+        const fields = [...new Set(named.map(({ table, field }) => `${table}.${field}`))]
+        expect(fields.length).toBeGreaterThan(40)
+        expect(fields.filter((name) => !known(name.split('.')[0] ?? '', name.split('.')[1] ?? ''))).toEqual([])
+        const set = named.filter(({ table, field, value }) => value !== undefined && choicesOf(table, field) !== undefined)
+        expect(new Set(set.map(({ table, field }) => `${table}.${field}`)).size).toBeGreaterThanOrEqual(6)
+        expect(set.filter(({ table, field, value }) => !choicesOf(table, field)?.includes(String(value))).map(({ table, field, value }) => `${table}.${field} = ${value}`)).toEqual([])
+        expect(stages.length).toBeGreaterThan(0)
+        expect(stages.filter((stage) => !(stage in STAGE_FIELDS))).toEqual([])
+    })
 })
 
 /*
@@ -711,7 +747,8 @@ function builtAcls(): BuiltAcl[] {
                 table,
                 field,
                 records: /^sys_class_name=(\w+)$/.exec(acl.applies_to ?? '')?.[1] ?? table,
-                operation: acl.operation ?? '',
+                // An operation other than the CRUD ones is built as the id of its sys_security_operation.
+                operation: acl['operation.display_value'] ?? acl.operation ?? '',
                 deny: acl.decision_type === 'deny',
                 roles: rolesOf.get(acl.sys_id ?? '') ?? [],
                 appliesTo: acl.applies_to ?? '',
@@ -731,6 +768,31 @@ const isCustomerRole = (role: string) => role === ROLE.customerAdmin || role ===
  */
 const PROVIDER_STAFF = [...PROVIDER_STAFF_IN_ORDER].sort()
 const MONEY_READERS = [...MONEY_READERS_IN_ORDER].sort()
+
+type AclOperation = 'read' | 'query_range'
+
+/**
+ * The roles of one level's allow ACLs (`field` '' for the record, `*` for every field), the app's built ones and those
+ * recorded for a platform table ORed; null when the level has none, so the platform looks at the next.
+ */
+function levelReaders(grants: readonly BuiltAcl[], operation: AclOperation, table: string, field: string): string[] | null {
+    const own = grants.filter((acl) => acl.operation === operation && acl.records === table && acl.field === field).flatMap((acl) => acl.roles)
+    const facts = PLATFORM_TABLES[table]
+    const recorded = !field ? (operation === 'read' ? facts?.read : undefined) : (operation === 'read' ? facts?.fieldRead : facts?.fieldQueryRange)?.[field]
+    return own.length || recorded ? [...own, ...(recorded ?? [])] : null
+}
+
+/** The roles a user with `role` holds: those it contains, built or recorded, those held beside it, and public. */
+function rolesHeld(role: string): Set<string> {
+    const contained = records('sys_user_role_contains')
+    const roles = new Set([role, PUBLIC, ...(HELD_WITH[role] ?? [])])
+    for (const one of roles) {
+        for (const link of contained.filter((found) => found['role.name'] === one)) roles.add(link['contains.name'] ?? '')
+        for (const inner of PLATFORM_ROLE_CONTAINS[one] ?? []) roles.add(inner)
+    }
+    if (!roles.has(EXTERNAL)) roles.add(SIGNED_IN)
+    return roles
+}
 
 describe('the Return write ACL', () => {
     const writers = (table: string) =>
@@ -941,6 +1003,76 @@ describe('the rules and ACLs that scope what a reader sees', () => {
         })
     })
 
+    /*
+     * A reference shows and is searched only when its table and display field are readable (ADR 0005). On a child of
+     * ast_contract, a field ACL replaces ast_contract's for that field, so it names everyone who reads the field.
+     */
+    describe("ACLs on the platform tables and contract fields the app's records name", () => {
+        it('let provider staff read the Customer and its name only, and the broad staff companies, purchase orders and configuration items', () => {
+            const PLATFORM_TABLES_NAMED = ['customer_account', 'core_company', 'proc_po', 'cmdb_ci']
+            const CONTRACT_TABLES = ['x_daas_ham_agreement', 'x_daas_ham_lease_schedule']
+            const granted = Object.fromEntries(
+                builtAcls()
+                    .filter((acl) => PLATFORM_TABLES_NAMED.includes(acl.table) || (CONTRACT_TABLES.includes(acl.table) && acl.field))
+                    .map((acl) => [`${acl.operation} ${acl.table}${acl.field ? `.${acl.field}` : ''}`, [[...acl.roles].sort(), acl.deny, acl.script, acl.condition]]),
+            )
+            const allow = (roles: readonly string[]) => [[...roles].sort(), false, '', '']
+            const agreementReaders = allow(AGREEMENT_READERS)
+            const broadStaff = allow(BROAD_STAFF)
+            expect(granted).toEqual({
+                'read customer_account': allow(PROVIDER_STAFF),
+                'read customer_account.name': allow(PROVIDER_STAFF),
+                'read core_company': broadStaff,
+                'read proc_po': broadStaff,
+                'read cmdb_ci': broadStaff,
+                'read x_daas_ham_agreement.*': agreementReaders,
+                ...Object.fromEntries(
+                    ['number', 'short_description', 'state', 'starts', 'ends'].map((field) => [`read x_daas_ham_agreement.${field}`, allow(AGREEMENT_SUMMARY_READERS)]),
+                ),
+                ...Object.fromEntries(['*', 'starts'].map((field) => [`query_range x_daas_ham_agreement.${field}`, agreementReaders])),
+                ...Object.fromEntries(
+                    ['*', 'number', 'short_description', 'state', 'starts', 'ends', 'vendor', 'vendor_contract'].map((field) => [`read x_daas_ham_lease_schedule.${field}`, broadStaff]),
+                ),
+                ...Object.fromEntries(['*', 'starts', 'vendor', 'vendor_contract'].map((field) => [`query_range x_daas_ham_lease_schedule.${field}`, broadStaff])),
+            })
+            expect(AGREEMENT_READERS).toEqual([...BROAD_STAFF, PLATFORM_ROLE.serviceDeskAgent])
+            expect(AGREEMENT_SUMMARY_READERS).toEqual([...AGREEMENT_READERS, ROLE.customerAdmin])
+        })
+
+        it('take from no role that reads the rows a field it read through the table they extend', () => {
+            const grants = builtAcls().filter((acl) => !acl.deny)
+            const parentOf = new Map(records('sys_db_object').map((table) => [table.name ?? '', table['super_class.name'] ?? '']))
+            const parents = (table: string) => {
+                const tables: string[] = []
+                for (let on = parentOf.get(table) ?? ''; on; on = parentOf.get(on) ?? PLATFORM_TABLES[on]?.extends ?? '') tables.push(on)
+                return tables
+            }
+            const decided = (operation: AclOperation, tables: readonly string[], field: string) =>
+                tables.map((on) => levelReaders(grants, operation, on, field)).find((readers) => readers !== null) ?? null
+            const passes = (role: string, readers: readonly string[]) => {
+                const held = rolesHeld(role)
+                return readers.some((reader) => held.has(reader))
+            }
+            const roles = [...Object.values(ROLE), ...Object.values(PLATFORM_ROLE)]
+            const fieldAcls = new Map(
+                grants
+                    .filter((acl) => acl.field && (acl.operation === 'read' || acl.operation === 'query_range'))
+                    .map((acl) => [`${acl.operation} ${acl.records}.${acl.field}`, { operation: acl.operation as AclOperation, table: acl.records, field: acl.field }]),
+            )
+            const replaced = [...fieldAcls].flatMap(([name, { operation, table, field }]) => {
+                const before =
+                    decided(operation, parents(table), field) ?? (operation === 'query_range' && PUBLIC_QUERY_RANGE_FIELDS.has(field) ? [PUBLIC] : null)
+                return before ? [{ name, before, after: levelReaders(grants, operation, table, field) ?? [], rows: decided('read', [table, ...parents(table)], '') ?? [] }] : []
+            })
+            expect(replaced.map(({ name }) => name)).toContain('read x_daas_ham_agreement.number')
+            expect(
+                replaced.flatMap(({ name, before, after, rows }) =>
+                    roles.filter((role) => passes(role, rows) && passes(role, before) && !passes(role, after)).map((role) => `${name}: ${role}`),
+                ),
+            ).toEqual([])
+        })
+    })
+
     describe('create ACLs of Orders, Order lines and Returns', () => {
         const creators = (table: string) => recordAcls().filter((acl) => acl.table === table && acl.operation === 'create')
         const forCustomer = (table: string) => creators(table).filter((acl) => acl.roles.some(isCustomerRole))
@@ -988,11 +1120,13 @@ describe('the rules and ACLs that scope what a reader sees', () => {
         /**
          * The app tables an inventory tech with no broader role may read: the Assets, Staging tasks and Audits of their
          * Stockrooms, and the ASN imports, Staging steps and templates, Orders, Shipments, Return orders, OEM RMAs and
-         * Disposal orders they work on, which are not narrowed to their Stockrooms. Every other table's read ACL leaves
-         * inventory techs out: the before-query rules do not hide those from them (ADR 0005).
+         * Disposal orders they work on, which are not narrowed to their Stockrooms, and the platform's Customers those
+         * name. Every other table's read ACL leaves inventory techs out: the before-query rules do not hide those from
+         * them (ADR 0005).
          */
         const INVENTORY_TECH_TABLES = [
             'alm_hardware',
+            'customer_account',
             'x_daas_ham_asn_import',
             'x_daas_ham_staging_task',
             'x_daas_ham_staging_step',
@@ -1063,8 +1197,8 @@ describe('the NaaS Asset Workspace', () => {
         expect([...AUDIENCE.money].sort()).toEqual(readsOf('x_daas_ham_margin').flatMap((acl) => acl.roles).sort())
     })
 
-    it('offers the Operations, Billing and Lifecycle tabs to every provider-staff role, so the NOC and the techs keep them', () => {
-        expect(DASHBOARD.filter((tab) => tab.id !== 'margin').map((tab) => tab.audience)).toEqual(['staff', 'staff', 'staff'])
+    it('offers the Operations and Lifecycle tabs to every provider-staff role, and Billing, which reads subscription lines, to the broad staff', () => {
+        expect(Object.fromEntries(DASHBOARD.map((tab) => [tab.id, tab.audience]))).toEqual({ operations: 'staff', billing: 'broadStaff', risk: 'staff', margin: 'money' })
     })
 
     it("leaves each widget's data to its table's read ACL: the Margin tab's to the money readers", () => {
@@ -1076,16 +1210,138 @@ describe('the NaaS Asset Workspace', () => {
         }
     })
 
-    it('offers each widget only to roles that read its table, so none shows a role a refusal', () => {
+    /*
+     * The instance lets a role read a reference field only when it reads the table the field points at, and show or
+     * search it only when it also reads that table's display field: a query that names the field, or dot-walks through
+     * it, is refused (the Table API) or matches nothing (the Stats API), and a column it may not read comes back blank.
+     * A list's search is a LIKE on each text column and on each reference column's display field, which needs their
+     * query_range ACLs too. The platform decides a field at the most specific level that has an ACL for it, ORing that
+     * level's ACLs: the field on its table, then on each table that one extends, then `*.<field>`, then `*` on the table
+     * and on each it extends. The platform tables' ACLs are those recorded in test-support/platform-acls.ts.
+     */
+    it('offers each widget and list only to roles that read, and search, every table and field it reaches', () => {
         const rolesOf: Readonly<Record<string, readonly string[]>> = AUDIENCE
-        for (const tab of DASHBOARD) {
-            for (const widget of tab.widgets) {
-                const readers = readsOf(widget.source.table).flatMap((acl) => acl.roles)
-                const offered = (rolesOf[tab.audience] ?? []).filter((role) => rolesOf[widgetAudience(tab, widget)]?.includes(role))
-                expect(offered.length, `${tab.id} ${widget.id}`).toBeGreaterThan(0)
-                expect(offered.filter((role) => !readers.includes(role)), `${tab.id} ${widget.id}`).toEqual([])
+        const appTables = new Map(records('sys_db_object').map((table) => [table.name ?? '', table['super_class.name'] ?? '']))
+        const columns = builtColumns()
+        const displayOverrides = records('sys_dictionary_override').filter((override) => override.display_override === 'true')
+        const unrecorded = new Set<string>()
+        const chain = (table: string): string[] => {
+            const tables: string[] = []
+            for (let on = table; on; on = appTables.get(on) ?? PLATFORM_TABLES[on]?.extends ?? '') {
+                if (!appTables.has(on) && !PLATFORM_TABLES[on]) unrecorded.add(on)
+                tables.push(on)
             }
+            return tables
         }
+        const column = (table: string, field: string) => columns.find((found) => found.table === table && found.name === field)
+        const referenceOf = (table: string, field: string): string | undefined => {
+            for (const on of chain(table)) {
+                const target = column(on, field)?.reference ?? PLATFORM_TABLES[on]?.references?.[field]
+                if (typeof target === 'string' && target) return target
+            }
+            return undefined
+        }
+        const displayOf = (table: string): string | undefined => {
+            for (const on of chain(table)) {
+                const display =
+                    columns.find((found) => found.table === on && found.display === 'true')?.name ??
+                    displayOverrides.find((override) => override.name === on)?.element ??
+                    PLATFORM_TABLES[on]?.display
+                if (display) return display
+            }
+            return undefined
+        }
+        const grants = builtAcls().filter((acl) => !acl.deny)
+        const level = (operation: AclOperation, table: string, field: string) => levelReaders(grants, operation, table, field)
+        const tableReaders = (table: string): string[] | null => {
+            for (const on of chain(table)) {
+                const readers = level('read', on, '')
+                if (readers) return readers
+            }
+            return null
+        }
+        const fieldReaders = (operation: AclOperation, table: string, field: string): string[] | null => {
+            const tables = chain(table)
+            for (const on of tables) {
+                const readers = level(operation, on, field)
+                if (readers) return readers
+            }
+            if (operation === 'query_range' && PUBLIC_QUERY_RANGE_FIELDS.has(field)) return [PUBLIC]
+            for (const on of tables) {
+                const readers = level(operation, on, '*')
+                if (readers) return readers
+            }
+            return null
+        }
+        const NOT_SEARCHED = new Set(['integer', 'longint', 'decimal', 'float', 'currency', 'price', 'percent_complete', 'boolean'])
+        const searchedAs = (table: string, path: string): string | null => {
+            const parts = path.split('.')
+            const last = parts.pop() ?? ''
+            const on = parts.reduce((from, part) => referenceOf(from, part) ?? '', table)
+            const target = referenceOf(on, last)
+            if (target) {
+                const display = displayOf(target)
+                return display ? `${path}.${display}` : null
+            }
+            const type = chain(on)
+                .map((from) => column(from, last)?.type)
+                .find((found) => typeof found === 'string')
+            return typeof type === 'string' && NOT_SEARCHED.has(type) ? null : path
+        }
+        const conditionFields = (filter: string) =>
+            filter
+                .split(/\^NQ|\^OR|\^/)
+                .flatMap((term) => /^[a-z0-9_]+(?:\.[a-z0-9_]+)*/.exec(term)?.[0] ?? [])
+                .filter((field) => field !== 'javascript')
+        interface Reach {
+            path: string
+            search: boolean
+        }
+        const refusals = (role: string, table: string, reaches: readonly Reach[]): string[] => {
+            const roles = rolesHeld(role)
+            const reads = (readers: readonly string[] | null) => readers === null || readers.some((reader) => roles.has(reader))
+            const refused = reads(tableReaders(table)) ? [] : [table]
+            for (const { path, search } of reaches) {
+                let on = table
+                for (const field of path.split('.')) {
+                    if (!reads(fieldReaders('read', on, field))) refused.push(`${path}: ${on}.${field}`)
+                    if (search && !reads(fieldReaders('query_range', on, field))) refused.push(`search ${path}: ${on}.${field}`)
+                    const target = referenceOf(on, field)
+                    if (!target) break
+                    if (!reads(tableReaders(target))) refused.push(`${path}: ${on}.${field} -> ${target}`)
+                    on = target
+                }
+            }
+            return [...new Set(refused)]
+        }
+        const shown = (paths: readonly string[]): Reach[] => [...new Set(paths)].map((path) => ({ path, search: false }))
+        const offeredQueries = [
+            ...DASHBOARD.flatMap((tab) =>
+                tab.widgets.map((widget) => ({
+                    what: `widget ${tab.id}/${widget.id}`,
+                    roles: (rolesOf[tab.audience] ?? []).filter((role) => rolesOf[widgetAudience(tab, widget)]?.includes(role)),
+                    table: widget.source.table,
+                    reaches: shown([...conditionFields(widget.source.filter), ...('by' in widget ? [widget.by] : []), ...('sum' in widget ? [widget.sum.amount, widget.sum.currency] : [])]),
+                })),
+            ),
+            ...WORKSPACE_LISTS.map((list) => ({
+                what: `list ${list.id}`,
+                roles: rolesOf[list.audience] ?? [],
+                table: list.table,
+                reaches: [
+                    ...shown([...conditionFields(list.filter), ...list.columns]),
+                    ...list.columns.flatMap((name) => {
+                        const searched = searchedAs(list.table, name)
+                        return searched ? [{ path: searched, search: true }] : []
+                    }),
+                ],
+            })),
+        ]
+        for (const query of offeredQueries) expect(query.roles.length, query.what).toBeGreaterThan(0)
+        const refused = offeredQueries.flatMap((query) =>
+            query.roles.flatMap((role) => refusals(role, query.table, query.reaches).map((refusal) => `${query.what} ${role} ${refusal}`)),
+        )
+        expect([...[...unrecorded].map((table) => `record who reads ${table}`), ...refused]).toEqual([])
     })
 
     it('offers a list or a tab on a money table to the money readers only', () => {
@@ -1101,6 +1357,20 @@ describe('the NaaS Asset Workspace', () => {
         for (const tab of DASHBOARD.filter((found) => found.widgets.some((widget) => moneyTables.includes(widget.source.table)))) {
             expect(tab.audience, tab.id).toBe('money')
         }
+    })
+})
+
+/*
+ * domain/roles ROLE is the one list of the app's roles. A role the server code asks for but the metadata does not
+ * declare exists on no instance: gs.hasRole is then false for everyone but an administrator, and the build passes.
+ */
+describe('roles', () => {
+    it('are declared, each once, under the name the server code asks for', () => {
+        expect(
+            records('sys_user_role')
+                .map((role) => role.name)
+                .sort(),
+        ).toEqual(Object.values(ROLE).sort())
     })
 })
 
@@ -1306,6 +1576,56 @@ describe('choices of the record producers', () => {
     })
 })
 
+describe('the record producers', () => {
+    // Refused by the before-insert rule, a producer's request still stores its answers (question_answer), which the app
+    // may not delete; refused by the producer's own script, it stores none (external-contracts N48).
+    it("check a Customer contact's request in their script, before the insert rule would", () => {
+        const scripts = records('sc_cat_item_producer').map((producer) => ({ table: producer.table_name, script: wrapped(producer.script ?? '') }))
+        expect(scripts).toEqual(
+            expect.arrayContaining([
+                { table: 'x_daas_ham_order', script: { fn: 'beforeOrderProduced', path: expect.stringContaining('/src/server/entry/orders.ts'), call: 'producer, current' } },
+                { table: 'x_daas_ham_return_order', script: { fn: 'beforeReturnProduced', path: expect.stringContaining('/src/server/entry/returns.ts'), call: 'producer, current' } },
+            ]),
+        )
+        expect(scripts).toHaveLength(2)
+    })
+
+    // The specs' requesters of both: the Order and Return create rules' roles (docs/spec/p1-ordering.md "Raising an
+    // Order", p2-aftersales.md). The service desk's role is the platform's, its sys_id per instance, so it is matched by
+    // name in the script.
+    const BY_ROLE = [ROLE.assetManager, ROLE.accountManager, ROLE.noc, ROLE.customerAdmin].sort()
+
+    it('are available for the Order raisers and Customer admins only, never site contacts, with no Not available for row', () => {
+        const roleNames = new Map(records('sys_user_role').map((role) => [role.sys_id, role.name]))
+        const criteria = new Map(records('user_criteria').map((criterion) => [criterion.sys_id, criterion]))
+        const audiences = records('sc_cat_item_producer').map((producer) => ({
+            table: producer.table_name,
+            availableFor: records('sc_cat_item_user_criteria_mtom')
+                .filter((row) => row.sc_cat_item === producer.sys_id)
+                .map((row) => criteria.get(row.user_criteria ?? ''))
+                .map((criterion) => ({
+                    active: criterion?.active,
+                    matchAll: criterion?.match_all,
+                    roles: (criterion?.role ?? '')
+                        .split(',')
+                        .map((id) => roleNames.get(id) ?? `unknown role ${id}`)
+                        .sort(),
+                    script: criterion?.script ?? '',
+                })),
+        }))
+        expect(audiences.map(({ table }) => table).sort()).toEqual(['x_daas_ham_order', 'x_daas_ham_return_order'])
+        for (const { table, availableFor } of audiences) {
+            expect({ table, availableFor }).toEqual({ table, availableFor: [{ active: 'true', matchAll: 'false', roles: BY_ROLE, script: expect.any(String) }] })
+            const { script = '', roles = [] } = availableFor[0] ?? {}
+            expect(script).toContain(`held.addQuery('user', user_id);`)
+            expect(script).toContain(`held.addQuery('role.name', '${PLATFORM_ROLE.serviceDeskAgent}');`)
+            expect(script).not.toContain(ROLE.siteContact)
+            expect(roles).not.toContain(ROLE.siteContact)
+        }
+        expect(records('sc_cat_item_user_criteria_no_mtom')).toEqual([])
+    })
+})
+
 /*
  * The substatus values the app adds to alm_asset.substatus, a field it does not own: the build writes them as one
  * choice set, which must add its own values and delete nothing else of the field's.
@@ -1447,8 +1767,9 @@ describe('ATF tests', () => {
     it('load in their scripts server modules by the path the build installs them under, and call what those export', () => {
         const modules = new Map(records('sys_module').map((module) => [module.path ?? '', module.content ?? '']))
         for (const { step, script } of stepScripts()) {
-            // A script that calls a REST route over HTTP reaches the app through the route, not a module.
-            if (!/\bsn_ws\.RESTMessageV2\b/.test(script)) expect(loaded(script).length, step).toBeGreaterThan(0)
+            // A script that calls a REST route over HTTP reaches the app through the route, and one that only inserts
+            // records reaches it through the rules on their tables, not a module.
+            if (!/\bsn_ws\.RESTMessageV2\b|\.insert\(\)/.test(script)) expect(loaded(script).length, step).toBeGreaterThan(0)
             expect([...script.matchAll(/\brequire\(/g)].length, `${step}: every require is read`).toBe(loaded(script).length)
             const code = script.replace(/'[^'\n]*'/g, "''")
             for (const { binding, path } of loaded(script)) {
@@ -1503,6 +1824,11 @@ describe('ATF tests', () => {
         getRowCount() {
             return 1
         }
+        initialize() {}
+        setValue() {}
+        insert() {
+            return ''
+        }
     }
 
     class StandInRest {
@@ -1547,13 +1873,14 @@ describe('ATF tests', () => {
     }
 
     // A step passes or fails by what its script returns. Run here, a script fails only on the reply it checks, which a
-    // stand-in answers HTTP 599, or on the job lock it probes before it writes, which a stand-in module never says
-    // is free: one that fails for another reason, or returns nothing, has an error of its own.
+    // stand-in answers HTTP 599, on the job lock it probes before it writes, which a stand-in module never says
+    // is free, or on an insert's outcome, which a stand-in record never stores yet always finds: one that fails for
+    // another reason, or returns nothing, has an error of its own.
     it('run their scripts to a verdict', () => {
         for (const { step, script } of stepScripts()) {
             const { verdict, message } = run(script)
             expect({ step, verdict: typeof verdict }).toEqual({ step, verdict: 'boolean' })
-            if (verdict === false) expect(message, step).toMatch(/expected HTTP|expected the lock/)
+            if (verdict === false) expect(message, step).toMatch(/expected HTTP|expected the lock|expected the insert/)
             expect(message, step).not.toMatch(/TypeError|ReferenceError|is not a function|is not defined|undefined/)
         }
     })

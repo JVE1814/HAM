@@ -125,7 +125,7 @@ export const customerReturnRequestTest = Test(
         $id: Now.ID['atf_customer_return_request'],
         name: 'NaaS - customer returns: admins only, own sites only, a decommission takes the whole site',
         description:
-            "Calls the customer returns handler as a site contact (HTTP 403), then as a customer admin naming another Customer's site (HTTP 400) and their own site with decommission: true listing one of its two installed fleet assets (HTTP 201); both assets then await the return, so the site's equipment was found server-side.",
+            "Calls the customer returns handler as a site contact (HTTP 403), then as a customer admin naming another Customer's site (HTTP 400) and their own site with decommission: true listing one of its two installed fleet assets (HTTP 201); both assets then await the return, so the site's equipment was found server-side. A Return order the admin then inserts by hand is not saved: it keeps no value, so names no Customer. Inserted by GlideRecord in the admin's session, a Return or an Order of their Customer at another Customer's site is not saved; with their own site, each is.",
         active: true,
         // The handler logs what it refuses; the scripts and validations below check the outcome.
         failOnServerError: false,
@@ -296,6 +296,72 @@ export const customerReturnRequestTest = Test(
         var raised = call(customer.requestCustomerReturn, { site: siteA, decommission: true, assets: [listed], method: 'ship_back' });
         seen.push(expectReply('Decommission of their own site', raised, 201));
         if (!raised.body || !raised.body.returnOrder) throw new Error('The decommission named no Return order: ' + JSON.stringify(raised.body));
+        stepResult.setOutputMessage(seen.join('; '));
+        return true;
+    } catch (e) {
+        stepResult.setOutputMessage(String(e && e.message ? e.message : e));
+        return false;
+    }
+})(outputs, steps, params, stepResult, assertEqual);`,
+        })
+        // Still the customer admin. A customer contact is an external user, whose insert by hand (a form, the Table API,
+        // this step) keeps no posted value: the platform's create field ACLs let internal users only set a field. So the
+        // Return arrives with no Customer, and the before-insert rule refuses it.
+        atf.server.recordInsert({
+            $id: Now.ID['atf_crr_insert_no_customer'],
+            table: 'x_daas_ham_return_order',
+            fieldValues: { short_description: 'ATF returns insert with no customer' },
+            assert: 'record_not_inserted',
+        })
+        // A hand insert never brings a Site to the rules, so the admin inserts by GlideRecord, which keeps the values
+        // and checks no ACL but runs the rules in the admin's session: any insert path that keeps values meets them.
+        // An Order and a Return of their own Site are the controls, so each refusal is the Site's.
+        atf.server.runServerSideScript({
+            $id: Now.ID['atf_crr_insert_by_script'],
+            script: `(function (outputs, steps, params, stepResult, assertEqual) {
+    function idOf(table, query) {
+        var record = new GlideRecord(table);
+        record.addEncodedQuery(query);
+        record.setLimit(1);
+        record.query();
+        if (!record.next()) throw new Error('no ' + table + ' matches ' + query);
+        return record.getUniqueValue();
+    }
+    function insert(table, values) {
+        var record = new GlideRecord(table);
+        record.initialize();
+        for (var field in values) record.setValue(field, values[field]);
+        return record.insert();
+    }
+    function storedCount(table, shortDescription) {
+        var record = new GlideRecord(table);
+        record.addQuery('short_description', shortDescription);
+        record.query();
+        return record.getRowCount();
+    }
+    function expectInsert(what, table, values, stored) {
+        var id = insert(table, values);
+        var count = storedCount(table, values.short_description);
+        var outcome = stored ? 'stored' : 'refused';
+        if (stored ? !id || count !== 1 : id || count !== 0) {
+            throw new Error(what + ': expected the insert ' + outcome + ', got id "' + id + '" and ' + count + ' stored');
+        }
+        return what + ': ' + outcome;
+    }
+    try {
+        var customerA = idOf('customer_account', 'name=ATF Returns Customer A');
+        var siteA = idOf('cmn_location', 'name=ATF Returns Site A');
+        var siteB = idOf('cmn_location', 'name=ATF Returns Site B');
+        var agreement = idOf('x_daas_ham_agreement', 'short_description=ATF returns agreement');
+        var seen = [];
+        seen.push(expectInsert('A Return of their Customer at another Customer site', 'x_daas_ham_return_order',
+            { customer: customerA, site: siteB, short_description: 'ATF returns script insert with another site' }, false));
+        seen.push(expectInsert('An Order of their Customer and Agreement at another Customer site', 'x_daas_ham_order',
+            { customer: customerA, agreement: agreement, site: siteB, short_description: 'ATF order script insert with another site' }, false));
+        seen.push(expectInsert('A Return of their Customer and Site', 'x_daas_ham_return_order',
+            { customer: customerA, site: siteA, short_description: 'ATF returns script insert with their own site' }, true));
+        seen.push(expectInsert('An Order of their Customer, Agreement and Site', 'x_daas_ham_order',
+            { customer: customerA, agreement: agreement, site: siteA, short_description: 'ATF order script insert with their own site' }, true));
         stepResult.setOutputMessage(seen.join('; '));
         return true;
     } catch (e) {
