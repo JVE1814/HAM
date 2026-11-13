@@ -1,6 +1,6 @@
 import '@servicenow/sdk/global'
 import { Acl } from '@servicenow/sdk/core'
-import { AGREEMENT_READERS, BROAD_STAFF } from '../../server/domain/roles'
+import { AGREEMENT_READERS, AGREEMENT_SUMMARY_READERS, BROAD_STAFF } from '../../server/domain/roles'
 import { grantsCustomerRecord } from '../../server/entry/visibility'
 import { commercialEditors, customerAdmin, serviceDesk } from '../shared/roles.now'
 
@@ -273,11 +273,12 @@ Acl({
 })
 
 /*
- * An Agreement extends ast_contract, whose field ACLs let contract_manager read and search every field and the service
- * desk read a few: the NOC, account managers and finance got every Agreement column blank. The platform decides a field
- * at the most specific level with an ACL for it (ADR 0005), so these replace ast_contract's: `*` for the fields with no
- * ACL of their own, the others for the fields ast_contract guards by name. Each lists everyone who reads the field, the
- * service desk too (AGREEMENT_READERS). The other fields' searches are public (`*.<field>`).
+ * An Agreement extends ast_contract, whose field ACLs let contract_manager read and search every field, and the service
+ * desk and Customer admins read a few: the NOC, account managers and finance got every Agreement column blank. The
+ * platform decides a field at the most specific level with an ACL for it (ADR 0005), so these replace ast_contract's:
+ * `*` for the fields with no ACL of their own, the others for the fields ast_contract guards by name. Each lists everyone
+ * who reads the field, the service desk too (AGREEMENT_READERS), and on number, short description, state, starts and
+ * ends Customer admins (AGREEMENT_SUMMARY_READERS). The other fields' searches are public (`*.<field>`).
  */
 Acl({
     $id: Now.ID['acl_agreement_fields_read'],
@@ -294,7 +295,7 @@ Acl({
     table: 'x_daas_ham_agreement',
     field: 'number',
     operation: 'read',
-    roles: AGREEMENT_READERS,
+    roles: AGREEMENT_SUMMARY_READERS,
 })
 
 Acl({
@@ -303,7 +304,7 @@ Acl({
     table: 'x_daas_ham_agreement',
     field: 'short_description',
     operation: 'read',
-    roles: AGREEMENT_READERS,
+    roles: AGREEMENT_SUMMARY_READERS,
 })
 
 Acl({
@@ -312,7 +313,7 @@ Acl({
     table: 'x_daas_ham_agreement',
     field: 'state',
     operation: 'read',
-    roles: AGREEMENT_READERS,
+    roles: AGREEMENT_SUMMARY_READERS,
 })
 
 Acl({
@@ -321,7 +322,7 @@ Acl({
     table: 'x_daas_ham_agreement',
     field: 'starts',
     operation: 'read',
-    roles: AGREEMENT_READERS,
+    roles: AGREEMENT_SUMMARY_READERS,
 })
 
 Acl({
@@ -330,7 +331,7 @@ Acl({
     table: 'x_daas_ham_agreement',
     field: 'ends',
     operation: 'read',
-    roles: AGREEMENT_READERS,
+    roles: AGREEMENT_SUMMARY_READERS,
 })
 
 Acl({

@@ -1,17 +1,19 @@
 /**
- * What the platform's ACLs let provider staff do on the platform tables the workspace reaches, as recorded on a dev
- * instance in November 2026 (docs/research/external-contracts.md N50). The app ships none of these ACLs, so the build
- * cannot tell; `built-metadata.test.ts` judges a workspace list or widget by these facts and the app's own built ACLs
- * together, and fails on a platform table it reaches that has no entry here.
+ * What the platform's ACLs let provider staff, and on ast_contract Customer admins, do on the platform tables the
+ * workspace reaches, as recorded on a dev instance in November 2026 (docs/research/external-contracts.md N50). The app
+ * ships none of these ACLs, so the build cannot tell; `built-metadata.test.ts` judges a workspace list or widget by
+ * these facts and the app's own built ACLs together, and fails on a platform table it reaches that has no entry here.
+ * It also holds each field ACL the app puts on a child of ast_contract to every reader the field had through it.
  *
  * A role list is the roles of the ACLs of one name and operation, ORed. Where an ACL's script narrows its roles, the
- * list holds the roles that were seen to pass it. `public` passes everyone, `snc_internal` every provider-staff user.
- * An entry that omits `read`, or a field, records no ACL there: every provider-staff role was seen to read it through
- * every workspace list, or the app's own ACLs decide.
+ * list holds the roles that were seen to pass it. `public` passes everyone, `snc_internal` every user who holds no
+ * `snc_external`, so every provider-staff user and no Customer contact. An entry that omits `read`, or a field, records
+ * no ACL there: every provider-staff role was seen to read it through every workspace list, or the app's own ACLs decide.
  */
 
 export const PUBLIC = 'public'
 export const SIGNED_IN = 'snc_internal'
+export const EXTERNAL = 'snc_external'
 
 export interface PlatformTable {
     /** The platform table it extends, whose ACLs and columns it inherits. */
@@ -32,10 +34,15 @@ const CONTRACT_MANAGER = 'contract_manager'
 const SERVICE_DESK = 'sn_customerservice_agent'
 
 /*
- * ast_contract's field read ACLs script `gs.hasRole('contract_manager') || ...`; the service desk was seen to read
- * number, short description, state, starts and ends, and no field of the `*` ACL.
+ * ast_contract's number, short description, state, starts and ends each have a CRM Base Entities read ACL for
+ * snc_internal, sn_esm_user and sn_customerservice.requester whose script admits contract_manager, sn_esm_user,
+ * sn_esm_agent and sn_customerservice.requester, and on all but number sn_customerservice.customer_data_viewer (its
+ * Subscription contract model admits no Agreement, as none has one). So a Customer admin passes it through sn_esm_user,
+ * and the service desk through sn_esm_agent. Each field's other ACL, Service Management Core's for snc_internal, admits
+ * contract_manager and a role the NOC, account managers and finance were seen not to hold.
  */
-const CONTRACT_FIELD_READERS = [CONTRACT_MANAGER, SERVICE_DESK]
+const CONTRACT_FIELD_READERS = [CONTRACT_MANAGER, 'sn_esm_user', 'sn_esm_agent', 'sn_customerservice.requester']
+const CONTRACT_DETAIL_READERS = [...CONTRACT_FIELD_READERS, 'sn_customerservice.customer_data_viewer']
 
 export const PLATFORM_TABLES: Readonly<Record<string, PlatformTable>> = {
     customer_account: {
@@ -122,10 +129,10 @@ export const PLATFORM_TABLES: Readonly<Record<string, PlatformTable>> = {
         fieldRead: {
             '*': [CONTRACT_MANAGER],
             number: CONTRACT_FIELD_READERS,
-            short_description: CONTRACT_FIELD_READERS,
-            state: CONTRACT_FIELD_READERS,
-            starts: CONTRACT_FIELD_READERS,
-            ends: CONTRACT_FIELD_READERS,
+            short_description: CONTRACT_DETAIL_READERS,
+            state: CONTRACT_DETAIL_READERS,
+            starts: CONTRACT_DETAIL_READERS,
+            ends: CONTRACT_DETAIL_READERS,
             vendor: [CONTRACT_MANAGER],
             vendor_contract: [CONTRACT_MANAGER],
             description: [CONTRACT_MANAGER],
@@ -198,4 +205,23 @@ export const PLATFORM_ROLE_CONTAINS: Readonly<Record<string, readonly string[]>>
     procurement_user: ['canvas_user', 'model_manager', 'sn_itam_recomm.recommendations_read', 'financial_mgmt_user'],
     contract_manager: ['financial_mgmt_user', 'sn_itam_recomm.recommendations_read', 'canvas_user'],
     service_viewer: ['cmdb_read', 'pa_viewer'],
+    [SERVICE_DESK]: [
+        'sn_esm_agent',
+        'sn_templated_snip.template_snippet_reader',
+        'actsub_user',
+        'sn_shn.editor',
+        'knowledge',
+        'chat_admin',
+        'template_editor',
+    ],
+    'sn_customerservice.customer': ['sn_esm_user', EXTERNAL],
+    sn_esm_user: [EXTERNAL],
+}
+
+/**
+ * The platform roles the holders of an app role hold beside it, which the app does not grant: the Customer admin seen
+ * is a Customer Service contact with sn_customerservice.customer.
+ */
+export const HELD_WITH: Readonly<Record<string, readonly string[]>> = {
+    'x_daas_ham.customer_admin': ['sn_customerservice.customer'],
 }

@@ -69,7 +69,8 @@ field ACLs let only `contract_manager` read and search every field. The platform
 level with an ACL for it, ORing that level's ACLs: the field on the table, then on each table it extends, then
 `*.<field>`, then `*` on the table and on each it extends. So the app's field ACLs on the two tables
 (`agreements/access.now.ts`, `leases/access.now.ts`) name every role that reads each field: the broad staff, and on
-Agreements the service desk, which reads an Agreement's number, short description, state, starts and ends (ADR 0005).
+Agreements the service desk and Customer admins, which read an Agreement's number, short description, state, starts
+and ends and no other field of it (ADR 0005).
 
 An inventory tech's stockrooms are the NaaS stockrooms whose *Assignment group* (the platform's
 `alm_stockroom.assignment_group`) is a group they are a member of (ADR 0018).

@@ -9016,6 +9016,19 @@ declare global {
                     },
                     {
                         table: 'sys_security_acl_role'
+                        id: '0e56e96d7fdb459092e2e0b340f4fdcd'
+                        key: {
+                            sys_security_acl: 'b22048868bb344788d3f9f8e1bee8ad8'
+                            sys_user_role: {
+                                id: 'fd154cb7b91e4ef5aa4da43a7344134d'
+                                key: {
+                                    name: 'x_daas_ham.customer_admin'
+                                }
+                            }
+                        }
+                    },
+                    {
+                        table: 'sys_security_acl_role'
                         id: '0e5c39776e174534b8d90966d91e2dbc'
                         key: {
                             sys_security_acl: '88262b53f0ef421384aee27ee17530a4'
@@ -34780,6 +34793,19 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_security_acl_role'
+                        id: '7b5a01e3a30248cfa3a8db86a1422cbb'
+                        key: {
+                            sys_security_acl: 'b2878ba9bda34baea09cc7b26a7f6de9'
+                            sys_user_role: {
+                                id: 'fd154cb7b91e4ef5aa4da43a7344134d'
+                                key: {
+                                    name: 'x_daas_ham.customer_admin'
+                                }
+                            }
+                        }
+                    },
+                    {
                         table: 'sys_variable_value'
                         id: '7b88a56cd2ec4166955205edb1eda728'
                         key: {
@@ -46244,6 +46270,19 @@ declare global {
                     },
                     {
                         table: 'sys_security_acl_role'
+                        id: 'ab1c560bee6e468dae550ce8e9154185'
+                        key: {
+                            sys_security_acl: '5818a33c56c54723b35794a1a566207f'
+                            sys_user_role: {
+                                id: 'fd154cb7b91e4ef5aa4da43a7344134d'
+                                key: {
+                                    name: 'x_daas_ham.customer_admin'
+                                }
+                            }
+                        }
+                    },
+                    {
+                        table: 'sys_security_acl_role'
                         id: 'ab439d7b05e0480dacdc3bbe57a5e2b2'
                         key: {
                             sys_security_acl: 'c5048d1871a146c1956d2d7ba9e129dd'
@@ -51973,6 +52012,19 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_security_acl_role'
+                        id: 'c578dae1b2564c87840eea4bf0c89caf'
+                        key: {
+                            sys_security_acl: 'eb5f9edf20224afda00ac4da7ae7fa9c'
+                            sys_user_role: {
+                                id: 'fd154cb7b91e4ef5aa4da43a7344134d'
+                                key: {
+                                    name: 'x_daas_ham.customer_admin'
+                                }
+                            }
+                        }
+                    },
+                    {
                         table: 'sys_documentation'
                         id: 'c57a27cd068e4005a76124d54acd3299'
                         key: {
@@ -55004,6 +55056,19 @@ declare global {
                             name: 'x_daas_ham_agreement'
                             element: 'refresh_basis'
                             language: 'en'
+                        }
+                    },
+                    {
+                        table: 'sys_security_acl_role'
+                        id: 'd1a40ffb4de341bf963dc33c49ba8137'
+                        key: {
+                            sys_security_acl: 'cd816349c3de4d799296c80c0af2a0cc'
+                            sys_user_role: {
+                                id: 'fd154cb7b91e4ef5aa4da43a7344134d'
+                                key: {
+                                    name: 'x_daas_ham.customer_admin'
+                                }
+                            }
                         }
                     },
                     {

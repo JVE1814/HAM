@@ -394,7 +394,10 @@ part of a Customer's name finds that Customer's Orders, and *Lines awaiting stoc
 purchase orders. As finance, *Agreements* and *Lease schedules* show every column, and a search on
 either for part of a number or a contract number finds the record. As an inventory-tech-only user,
 *All orders* shows each Order's Customer. As a service desk agent with no NaaS role, an Agreement
-still shows its number, short description, state, starts and ends. None of this was run on an
+still shows its number, short description, state, starts and ends. As a Customer admin who holds
+`sn_customerservice.customer`, `GET /api/now/table/x_daas_ham_agreement?sysparm_fields=number,short_description,state,starts,ends,currency,customer`
+returns their Customer's Agreements with the first five fields and no currency or Customer, and the
+order producer's *Agreement* shows the Agreement's number. None of this was run on an
 instance from the build: the ACLs were made by hand there and the reads emulated.
 
 ### Customer creates

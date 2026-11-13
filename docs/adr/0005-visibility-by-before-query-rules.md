@@ -140,13 +140,19 @@ and `proc_po`. The service desk is given nothing new, and no staff role reads Cu
 does not grant.
 
 Agreements and Lease schedules extend `ast_contract`, whose field ACLs let `contract_manager` read and search every
-field, and the service desk read a few. The platform decides a field at the most specific level that has an ACL for
-it, ORing that level's ACLs: the field on the table, then on each table it extends, then `*.<field>`, then `*` on the
-table and on each table it extends. So the app's field ACLs on the two tables, for read and for query_range (which a
-LIKE search needs), replace `ast_contract`'s: `*`, and each field `ast_contract` guards by name. Each names everyone
-who reads the field: the broad staff, and on Agreements the service desk too (`AGREEMENT_READERS`). One that left a
-reader out would take the field from them: an Agreement `*` ACL naming finance alone, tried on the instance, took the
-currency, the Customer and the app's columns from the asset manager.
+field, and the service desk and Customer admins read a few. The platform decides a field at the most specific level
+that has an ACL for it, ORing that level's ACLs: the field on the table, then on each table it extends, then
+`*.<field>`, then `*` on the table and on each table it extends. So the app's field ACLs on the two tables, for read
+and for query_range (which a LIKE search needs), replace `ast_contract`'s: `*`, and each field `ast_contract` guards by
+name. Each names everyone who reads the field: the broad staff, and on Agreements the service desk too
+(`AGREEMENT_READERS`). An Agreement's number, short description, state, starts and ends also name Customer admins
+(`AGREEMENT_SUMMARY_READERS`): `ast_contract`'s CRM read ACLs for those fields admit `sn_esm_user`, which a Customer
+admin holds through Customer Service's `sn_customerservice.customer`. No other Agreement field, and no search of
+`starts`, was theirs before, and none is now. One that left a reader out would take the field from them: an Agreement
+`*` ACL naming finance alone, tried on the instance, took the currency, the Customer and the app's columns from the
+asset manager, and the first Agreement field ACLs, naming staff only, took those five fields from Customer admins. A
+build test holds each such ACL to every app role that reads the table's rows and read the field through
+`ast_contract`'s ACLs as recorded in `test-support/platform-acls.ts`.
 
 ## Consequences
 

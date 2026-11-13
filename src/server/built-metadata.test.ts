@@ -21,6 +21,7 @@ import { stagingClosing } from './domain/staging'
 import { SCOPED_TABLES, type TableScoping } from './domain/visibility'
 import {
     AGREEMENT_READERS,
+    AGREEMENT_SUMMARY_READERS,
     BROAD_STAFF,
     MONEY_READERS as MONEY_READERS_IN_ORDER,
     PLATFORM_ROLE,
@@ -57,7 +58,7 @@ import { giveToLessor } from './platform/leases'
 import { PROPERTY, type PropertyOf } from './domain/properties'
 import type { ForeignRecord } from './platform/records'
 import { restMessagePort } from './platform/rest-messages'
-import { PLATFORM_ROLE_CONTAINS, PLATFORM_TABLES, PUBLIC, PUBLIC_QUERY_RANGE_FIELDS, SIGNED_IN } from './test-support/platform-acls'
+import { EXTERNAL, HELD_WITH, PLATFORM_ROLE_CONTAINS, PLATFORM_TABLES, PUBLIC, PUBLIC_QUERY_RANGE_FIELDS, SIGNED_IN } from './test-support/platform-acls'
 import { AUDIENCE, CATEGORIES } from '../client/workspace/catalog'
 import { DASHBOARD, widgetAudience } from '../client/workspace/dashboard'
 
@@ -768,6 +769,31 @@ const isCustomerRole = (role: string) => role === ROLE.customerAdmin || role ===
 const PROVIDER_STAFF = [...PROVIDER_STAFF_IN_ORDER].sort()
 const MONEY_READERS = [...MONEY_READERS_IN_ORDER].sort()
 
+type AclOperation = 'read' | 'query_range'
+
+/**
+ * The roles of one level's allow ACLs (`field` '' for the record, `*` for every field), the app's built ones and those
+ * recorded for a platform table ORed; null when the level has none, so the platform looks at the next.
+ */
+function levelReaders(grants: readonly BuiltAcl[], operation: AclOperation, table: string, field: string): string[] | null {
+    const own = grants.filter((acl) => acl.operation === operation && acl.records === table && acl.field === field).flatMap((acl) => acl.roles)
+    const facts = PLATFORM_TABLES[table]
+    const recorded = !field ? (operation === 'read' ? facts?.read : undefined) : (operation === 'read' ? facts?.fieldRead : facts?.fieldQueryRange)?.[field]
+    return own.length || recorded ? [...own, ...(recorded ?? [])] : null
+}
+
+/** The roles a user with `role` holds: those it contains, built or recorded, those held beside it, and public. */
+function rolesHeld(role: string): Set<string> {
+    const contained = records('sys_user_role_contains')
+    const roles = new Set([role, PUBLIC, ...(HELD_WITH[role] ?? [])])
+    for (const one of roles) {
+        for (const link of contained.filter((found) => found['role.name'] === one)) roles.add(link['contains.name'] ?? '')
+        for (const inner of PLATFORM_ROLE_CONTAINS[one] ?? []) roles.add(inner)
+    }
+    if (!roles.has(EXTERNAL)) roles.add(SIGNED_IN)
+    return roles
+}
+
 describe('the Return write ACL', () => {
     const writers = (table: string) =>
         recordAcls()
@@ -999,7 +1025,10 @@ describe('the rules and ACLs that scope what a reader sees', () => {
                 'read core_company': broadStaff,
                 'read proc_po': broadStaff,
                 'read cmdb_ci': broadStaff,
-                ...Object.fromEntries(['*', 'number', 'short_description', 'state', 'starts', 'ends'].map((field) => [`read x_daas_ham_agreement.${field}`, agreementReaders])),
+                'read x_daas_ham_agreement.*': agreementReaders,
+                ...Object.fromEntries(
+                    ['number', 'short_description', 'state', 'starts', 'ends'].map((field) => [`read x_daas_ham_agreement.${field}`, allow(AGREEMENT_SUMMARY_READERS)]),
+                ),
                 ...Object.fromEntries(['*', 'starts'].map((field) => [`query_range x_daas_ham_agreement.${field}`, agreementReaders])),
                 ...Object.fromEntries(
                     ['*', 'number', 'short_description', 'state', 'starts', 'ends', 'vendor', 'vendor_contract'].map((field) => [`read x_daas_ham_lease_schedule.${field}`, broadStaff]),
@@ -1007,6 +1036,40 @@ describe('the rules and ACLs that scope what a reader sees', () => {
                 ...Object.fromEntries(['*', 'starts', 'vendor', 'vendor_contract'].map((field) => [`query_range x_daas_ham_lease_schedule.${field}`, broadStaff])),
             })
             expect(AGREEMENT_READERS).toEqual([...BROAD_STAFF, PLATFORM_ROLE.serviceDeskAgent])
+            expect(AGREEMENT_SUMMARY_READERS).toEqual([...AGREEMENT_READERS, ROLE.customerAdmin])
+        })
+
+        it('take from no role that reads the rows a field it read through the table they extend', () => {
+            const grants = builtAcls().filter((acl) => !acl.deny)
+            const parentOf = new Map(records('sys_db_object').map((table) => [table.name ?? '', table['super_class.name'] ?? '']))
+            const parents = (table: string) => {
+                const tables: string[] = []
+                for (let on = parentOf.get(table) ?? ''; on; on = parentOf.get(on) ?? PLATFORM_TABLES[on]?.extends ?? '') tables.push(on)
+                return tables
+            }
+            const decided = (operation: AclOperation, tables: readonly string[], field: string) =>
+                tables.map((on) => levelReaders(grants, operation, on, field)).find((readers) => readers !== null) ?? null
+            const passes = (role: string, readers: readonly string[]) => {
+                const held = rolesHeld(role)
+                return readers.some((reader) => held.has(reader))
+            }
+            const roles = [...Object.values(ROLE), ...Object.values(PLATFORM_ROLE)]
+            const fieldAcls = new Map(
+                grants
+                    .filter((acl) => acl.field && (acl.operation === 'read' || acl.operation === 'query_range'))
+                    .map((acl) => [`${acl.operation} ${acl.records}.${acl.field}`, { operation: acl.operation as AclOperation, table: acl.records, field: acl.field }]),
+            )
+            const replaced = [...fieldAcls].flatMap(([name, { operation, table, field }]) => {
+                const before =
+                    decided(operation, parents(table), field) ?? (operation === 'query_range' && PUBLIC_QUERY_RANGE_FIELDS.has(field) ? [PUBLIC] : null)
+                return before ? [{ name, before, after: levelReaders(grants, operation, table, field) ?? [], rows: decided('read', [table, ...parents(table)], '') ?? [] }] : []
+            })
+            expect(replaced.map(({ name }) => name)).toContain('read x_daas_ham_agreement.number')
+            expect(
+                replaced.flatMap(({ name, before, after, rows }) =>
+                    roles.filter((role) => passes(role, rows) && passes(role, before) && !passes(role, after)).map((role) => `${name}: ${role}`),
+                ),
+            ).toEqual([])
         })
     })
 
@@ -1189,13 +1252,7 @@ describe('the NaaS Asset Workspace', () => {
             return undefined
         }
         const grants = builtAcls().filter((acl) => !acl.deny)
-        type Operation = 'read' | 'query_range'
-        const level = (operation: Operation, table: string, field: string): string[] | null => {
-            const own = grants.filter((acl) => acl.operation === operation && acl.records === table && acl.field === field).flatMap((acl) => acl.roles)
-            const facts = PLATFORM_TABLES[table]
-            const recorded = !field ? (operation === 'read' ? facts?.read : undefined) : (operation === 'read' ? facts?.fieldRead : facts?.fieldQueryRange)?.[field]
-            return own.length || recorded ? [...own, ...(recorded ?? [])] : null
-        }
+        const level = (operation: AclOperation, table: string, field: string) => levelReaders(grants, operation, table, field)
         const tableReaders = (table: string): string[] | null => {
             for (const on of chain(table)) {
                 const readers = level('read', on, '')
@@ -1203,7 +1260,7 @@ describe('the NaaS Asset Workspace', () => {
             }
             return null
         }
-        const fieldReaders = (operation: Operation, table: string, field: string): string[] | null => {
+        const fieldReaders = (operation: AclOperation, table: string, field: string): string[] | null => {
             const tables = chain(table)
             for (const on of tables) {
                 const readers = level(operation, on, field)
@@ -1231,15 +1288,6 @@ describe('the NaaS Asset Workspace', () => {
                 .find((found) => typeof found === 'string')
             return typeof type === 'string' && NOT_SEARCHED.has(type) ? null : path
         }
-        const contained = records('sys_user_role_contains')
-        const held = (role: string) => {
-            const roles = new Set([role, PUBLIC, SIGNED_IN])
-            for (const one of roles) {
-                for (const link of contained.filter((found) => found['role.name'] === one)) roles.add(link['contains.name'] ?? '')
-                for (const inner of PLATFORM_ROLE_CONTAINS[one] ?? []) roles.add(inner)
-            }
-            return roles
-        }
         const conditionFields = (filter: string) =>
             filter
                 .split(/\^NQ|\^OR|\^/)
@@ -1250,7 +1298,7 @@ describe('the NaaS Asset Workspace', () => {
             search: boolean
         }
         const refusals = (role: string, table: string, reaches: readonly Reach[]): string[] => {
-            const roles = held(role)
+            const roles = rolesHeld(role)
             const reads = (readers: readonly string[] | null) => readers === null || readers.some((reader) => roles.has(reader))
             const refused = reads(tableReaders(table)) ? [] : [table]
             for (const { path, search } of reaches) {
