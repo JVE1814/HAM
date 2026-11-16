@@ -214,7 +214,7 @@ function leavesOutsideNaas(scope: VisibilityScope): boolean {
 }
 
 /** Whether `scope` is a Customer contact's (a customer admin or a site contact), kept to their own Customer. */
-function isCustomerContact(scope: VisibilityScope): boolean {
+export function isCustomerContact(scope: VisibilityScope): boolean {
     return scope === 'own_customer' || scope === 'own_sites'
 }
 

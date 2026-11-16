@@ -58,7 +58,10 @@
 - **Tracking webhook**: `POST /api/x_daas_ham/naas/shipping/tracking` (no platform login). The token
   comes in the custom header `X-NaaS-Webhook-Token` (configure it on the ShipEngine webhook's
   `headers` or EasyPost's `custom_headers`), else in `?token=`; it must equal
-  `x_daas_ham.shipping.webhook_token`, and nothing is accepted while that is empty. ShipEngine
+  `x_daas_ham.shipping.webhook_token`, and nothing is accepted while that is empty or shorter than
+  `WEBHOOK_TOKEN_MIN_LENGTH` (32 characters, `domain/shipping.ts`): a call is then answered HTTP
+  401 as for a wrong token and logs nothing, since anyone can call the route; the preflight check
+  names the property (never the token) while it is set but too short. ShipEngine
   (`data.status_code`) and EasyPost tracker (`result.object = Tracker`, `result.status`) payloads are
   understood; other EasyPost events are refused, and the latest EasyPost tracking detail is the one
   with the latest `datetime`.
@@ -72,6 +75,10 @@
   the Shipment back (say from *Out for delivery* to *In transit*, or to *Label created*, which would
   offer *Mark label voided* again); a delivery or return is still taken.
   Unknown tracking numbers are acknowledged and ignored.
+  Of an update that lists more than `MAX_TRACKING_EVENTS` (100, `domain/shipping.ts`) tracking
+  events, only the newest 100 are taken, in the order listed, and a warning says how many were
+  left out: an aggregator resends the whole history each time, so the older ones were stored
+  from earlier updates, and an update is placed by its newest event.
   Each update is applied under the job lock `LOCK.trackShipment`, from the Shipment and
   its events read again there. So overlapping deliveries of the same history store each event once
   and note the delivery once, and an older status cannot replace a delivery.

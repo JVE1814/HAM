@@ -1,3 +1,4 @@
+import { ENDED_LINES_WITHOUT_END_DATE, IN_SERVICE_ON_PENDING_LINE } from '../../server/domain/billing'
 import { splitOrder, type Ordering } from '../../server/domain/encoded-query'
 import { INSTALLED_WITHOUT_COVERAGE } from '../../server/domain/coverage'
 import { FLEET_CONDITION, FLEET_INSTALLED, FLEET_IN_STAGE, INSTALLED_CONDITION, NAAS_MODEL_CONDITION, NAAS_MODEL_MILESTONES } from '../../server/domain/fleet'
@@ -166,7 +167,7 @@ const CATALOG = {
             table: 'alm_hardware',
             query: `${INSTALLED_CONDITION}^asset_tagISEMPTY^ORserial_numberISEMPTY^ORx_daas_ham_agreementISEMPTY^ORx_daas_ham_siteISEMPTY^${FLEET_CONDITION}`,
             columns: `${INSTALLED_ASSET_COLUMNS},x_daas_ham_agreement`,
-            audience: 'staff',
+            audience: 'broadStaff',
         },
     },
     'After-sales': {
@@ -174,7 +175,7 @@ const CATALOG = {
             title: 'Open replacement orders',
             table: 'x_daas_ham_order',
             query: `order_type=${ORDER_TYPE.device_replace}^${OPEN_ORDERS_QUERY}`,
-            columns: 'number,case,customer,site,stage,install_mode',
+            columns: 'number,customer,site,stage,install_mode',
             audience: 'staff',
         },
         refresh_open: {
@@ -346,6 +347,13 @@ const CATALOG = {
             columns: 'description,customer,agreement,line_type,site,device_class,monthly_rate,status,start_date',
             audience: 'broadStaff',
         },
+        lines_ended_no_end_date: {
+            title: 'Ended lines without an end date',
+            table: 'x_daas_ham_subscription_line',
+            query: ENDED_LINES_WITHOUT_END_DATE,
+            columns: 'description,customer,agreement,line_type,site,monthly_rate,status,start_date,end_date',
+            audience: 'broadStaff',
+        },
         catalog_entries: {
             title: 'Catalog entries',
             table: 'x_daas_ham_catalog_entry',
@@ -397,12 +405,13 @@ const CATALOG = {
             columns: 'billing_period,kind,customer,site,description,units,monthly_rate,amount,currency',
             audience: 'money',
         },
+        // Its Billing period column reads a money table; the other broad staff find the same fees under Open fee events.
         fees_unbilled: {
             title: 'Unbilled fees',
             table: 'x_daas_ham_fee_event',
             query: `${OPEN_FEES_QUERY}^ORDERBYoccurred_on`,
             columns: 'fee_type,customer,asset,return_order,amount,agreement.currency,occurred_on,billing_period',
-            audience: 'broadStaff',
+            audience: 'money',
         },
         service_intervals: {
             title: 'Open service intervals',
@@ -410,6 +419,14 @@ const CATALOG = {
             query: 'end_dateISEMPTY^ORDERBYstart_date',
             columns: 'asset,subscription_line,customer,site,start_date,end_date',
             audience: 'money',
+        },
+        // Its filter reads the line's status, so it is offered to the roles that read Subscription lines.
+        assets_on_pending_line: {
+            title: 'In service on a line not yet started',
+            table: 'alm_hardware',
+            query: IN_SERVICE_ON_PENDING_LINE,
+            columns: `${INSTALLED_ASSET_COLUMNS},x_daas_ham_subscription_line`,
+            audience: 'broadStaff',
         },
         margin: {
             title: 'Margin by customer and site',

@@ -1,8 +1,15 @@
 import { gs, type GlideRecord } from '@servicenow/glide'
 import type { RESTAPIRequest, RESTAPIResponse } from '@servicenow/glide/sn_ws_int'
 import { PROPERTY } from '../domain/properties.ts'
-import { parseTrackingWebhook, tokenMatches, WEBHOOK_TOKEN_HEADER, webhookToken } from '../domain/shipping.ts'
+import {
+    boundedTracking,
+    parseTrackingWebhook,
+    tokenMatches,
+    WEBHOOK_TOKEN_HEADER,
+    webhookToken,
+} from '../domain/shipping.ts'
 import { timesRequeued } from '../platform/events.ts'
+import { log } from '../platform/log.ts'
 import { secretProperty } from '../platform/properties.ts'
 import { str } from '../platform/records.ts'
 import { queryParam, reply } from '../platform/rest-api.ts'
@@ -33,12 +40,21 @@ export function uiMarkLabelVoided(current: GlideRecord): void {
  * sends the update again. An update held off by its Shipment's tracking lock is answered 202 and applied in the
  * background, not left to the aggregator; only one that cannot be queued is
  * answered 503.
+ * A configured token shorter than domain/shipping `WEBHOOK_TOKEN_MIN_LENGTH` counts as none: every call is answered as
+ * for a wrong token. Nothing is logged then, since anyone can call the route; the preflight check reports the property.
+ * Of an update that lists more events than `MAX_TRACKING_EVENTS`, only the newest are taken (`boundedTracking`), with
+ * a warning.
  */
 export function postTrackingUpdate(request: RESTAPIRequest, response: RESTAPIResponse): void {
     const token = webhookToken(request.getHeader(WEBHOOK_TOKEN_HEADER), queryParam(request, 'token'))
-    if (!tokenMatches(token, secretProperty(PROPERTY.shippingWebhookToken))) return reply(response, 401, { error: 'bad token' })
-    const update = parseTrackingWebhook(request.body.data)
-    if ('error' in update) return reply(response, 400, { error: update.error })
+    const secret = secretProperty(PROPERTY.shippingWebhookToken)
+    if (!tokenMatches(token, secret)) return reply(response, 401, { error: 'bad token' })
+    const parsed = parseTrackingWebhook(request.body.data)
+    if ('error' in parsed) return reply(response, 400, { error: parsed.error })
+    const { update, dropped } = boundedTracking(parsed)
+    if (dropped > 0) {
+        log.warn(`Tracking update of ${update.trackingNumber}: ${dropped} of its ${parsed.events.length} events left out, only the newest ${update.events.length} are taken`)
+    }
     const tracking = trackShipment(update)
     switch (tracking.outcome) {
         case 'unmatched':

@@ -4,7 +4,7 @@ import { explainWorkWindowRefusal, uiConfirmInstalled, uiShipOrder } from '../..
 import { completeInstallOfWork } from '../../server/platform/delivery'
 import { INSTALL_MODE, ORDER_STAGE, RETURN_METHOD, SHIPMENT_DIRECTION, SHIPMENT_STATUS, STAGE_FIELDS, TASK_STATE } from '../../server/domain/vocabulary'
 import { PLATFORM_ROLE } from '../../server/domain/roles'
-import { SHIPPING_MESSAGE } from '../../server/domain/shipping'
+import { SHIPPING_MESSAGE, WEBHOOK_TOKEN_MIN_LENGTH } from '../../server/domain/shipping'
 import { retryTrackingUpdate, uiCreateReturnLabel, uiMarkLabelVoided } from '../../server/entry/shipping'
 import { PROPERTY } from '../../server/domain/properties'
 import { EVENT } from '../../server/domain/events'
@@ -186,7 +186,7 @@ Property({
     name: PROPERTY.shippingWebhookToken.name,
     type: 'password2',
     value: PROPERTY.shippingWebhookToken.default,
-    description: 'Shared secret the tracking webhook sends in the X-NaaS-Webhook-Token header, or as ?token= (webhooks are refused while it is empty).',
+    description: `Shared secret the tracking webhook sends in the X-NaaS-Webhook-Token header, or as ?token= (webhooks are refused while it is empty or shorter than ${WEBHOOK_TOKEN_MIN_LENGTH} characters).`,
     roles: { read: [admin], write: [admin] },
 })
 

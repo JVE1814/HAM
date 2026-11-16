@@ -7,7 +7,10 @@ import {
     billsFromIntervals,
     currencyTotals,
     decideGenerationReset,
+    ENDED_LINES_WITHOUT_END_DATE,
+    endedLineProblem,
     IN_SERVICE_ON_ENDED_LINE,
+    IN_SERVICE_ON_PENDING_LINE,
     IN_SERVICE_UNBILLED,
     intervalEnd,
     PULL_PAGE,
@@ -61,8 +64,9 @@ describe('intervalEnd', () => {
         expect(intervalEnd('2026-11-07', '2026-11-07')).toBe('2026-11-07')
     })
 
-    it('never ends one before it started', () => {
-        expect(intervalEnd('2026-11-10', '2026-11-07')).toBe('2026-11-10')
+    it('gives no last day to one that starts later: it delivered no day, and is removed', () => {
+        expect(intervalEnd('2026-11-08', '2026-11-07')).toBeNull()
+        expect(intervalEnd('2026-11-10', '2026-11-07')).toBeNull()
     })
 })
 
@@ -337,18 +341,37 @@ describe('restartInterval', () => {
     })
 })
 
+describe('endedLineProblem', () => {
+    it('refuses a line set Ended without an End date, which billing would take as still open', () => {
+        expect(endedLineProblem({ status: 'ended', endDate: '' })).toBe(
+            'An Ended subscription line needs an End date, the last day it is billed: enter it (today, if the line ends now)',
+        )
+    })
+
+    it('lets an Ended line through with its End date, and a line that is not ended with or without one', () => {
+        expect(endedLineProblem({ status: 'ended', endDate: '2026-11-12' })).toBeNull()
+        for (const status of ['pending', 'active']) {
+            expect(endedLineProblem({ status, endDate: '' }), status).toBeNull()
+            expect(endedLineProblem({ status, endDate: '2026-11-12' }), status).toBeNull()
+        }
+    })
+})
+
 describe('IN_SERVICE_UNBILLED', () => {
     const flagged = (asset: SampleRecord) => matches(IN_SERVICE_UNBILLED, asset)
     const unbilled = (stage: Stage, fields: SampleRecord = {}) => assetIn(stage, { x_daas_ham_fleet: 'true', x_daas_ham_subscription_line: '', ...fields })
 
-    it('flags fleet assets in service on no Subscription line', () => {
-        expect(ALL_STAGES.filter((stage) => flagged(unbilled(stage)))).toEqual(['in_service'])
+    it('flags fleet assets in a billed stage on no Subscription line, a temporary deployment as one in service', () => {
+        expect(flagged(unbilled('temporary_deployment'))).toBe(true)
+        expect(ALL_STAGES.filter((stage) => flagged(unbilled(stage)))).toEqual([...IN_USE_STAGES])
     })
 
-    it("leaves out an asset on a line, and the Provider IT's (ADR 0016)", () => {
-        expect(flagged(unbilled('in_service', { x_daas_ham_subscription_line: 'sl1' }))).toBe(false)
-        expect(flagged(unbilled('in_service', { x_daas_ham_fleet: 'false' }))).toBe(false)
-        expect(flagged(unbilled('in_service', { x_daas_ham_fleet: '' }))).toBe(false)
+    it("leaves out an asset on a line, and the Provider IT's (ADR 0016), in either billed stage", () => {
+        for (const stage of IN_USE_STAGES) {
+            expect(flagged(unbilled(stage, { x_daas_ham_subscription_line: 'sl1' })), stage).toBe(false)
+            expect(flagged(unbilled(stage, { x_daas_ham_fleet: 'false' })), stage).toBe(false)
+            expect(flagged(unbilled(stage, { x_daas_ham_fleet: '' })), stage).toBe(false)
+        }
     })
 })
 
@@ -375,6 +398,37 @@ describe('IN_SERVICE_ON_ENDED_LINE', () => {
         expect(ALL_STAGES.filter((stage) => flagged({ ...billed('ended', ''), ...assetIn(stage) }))).toEqual([...IN_USE_STAGES])
         expect(flagged({ ...billed('ended', ''), x_daas_ham_fleet: 'false' })).toBe(false)
         expect(flagged({ ...billed('active', '2026-11-08'), ...assetIn('temporary_deployment'), x_daas_ham_fleet: '' })).toBe(false)
+    })
+})
+
+describe('IN_SERVICE_ON_PENDING_LINE', () => {
+    const flagged = (asset: SampleRecord) => matches(IN_SERVICE_ON_PENDING_LINE, asset)
+    const LINE = 'x_daas_ham_subscription_line'
+    const on = (status: string, fields: SampleRecord = {}) => assetIn('in_service', { x_daas_ham_fleet: 'true', [LINE]: 'sl1', [`${LINE}.status`]: status, ...fields })
+
+    it('flags fleet assets in a billed stage on a line still pending, which generation leaves out', () => {
+        expect(flagged(on('pending'))).toBe(true)
+        expect(ALL_STAGES.filter((stage) => flagged({ ...on('pending'), ...assetIn(stage) }))).toEqual([...IN_USE_STAGES])
+    })
+
+    it("leaves out an asset on a line that runs or has ended, one on no line, and the Provider IT's (ADR 0016)", () => {
+        expect(flagged(on('active'))).toBe(false)
+        expect(flagged(on('ended'))).toBe(false)
+        expect(flagged(on('', { [LINE]: '' }))).toBe(false)
+        expect(flagged(on('pending', { x_daas_ham_fleet: 'false' }))).toBe(false)
+        expect(flagged({ ...on('pending'), ...assetIn('temporary_deployment'), x_daas_ham_fleet: '' })).toBe(false)
+    })
+})
+
+describe('ENDED_LINES_WITHOUT_END_DATE', () => {
+    it('finds exactly the Subscription lines a save is refused for: set Ended, with no End date', () => {
+        const found = (status: string, endDate: string) => matches(ENDED_LINES_WITHOUT_END_DATE, { status, end_date: endDate })
+        expect(found('ended', '')).toBe(true)
+        for (const status of ['pending', 'active', 'ended']) {
+            for (const endDate of ['', '2026-11-12']) {
+                expect(found(status, endDate), `${status} ${endDate}`).toBe(endedLineProblem({ status, endDate }) !== null)
+            }
+        }
     })
 })
 

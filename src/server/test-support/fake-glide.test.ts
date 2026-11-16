@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it } from 'vitest'
 import { glide, platform, recordOf } from './fake-glide'
 
-const { GlideRecord, GlideAggregate, GlideDateTime, gs } = glide
+const { GlideRecord, GlideAggregate, GlideDateTime, GlideSysAttachment, gs } = glide
 
 const LINES = 'x_daas_ham_order_line'
 const ORDERS = 'x_daas_ham_order'
@@ -54,6 +54,27 @@ describe('reading', () => {
         expect(idsOf(line)).toEqual(['l1', 'l4', 'l3', 'l2'])
         line.setLimit(2)
         expect(idsOf(line)).toEqual(['l1', 'l4'])
+    })
+
+    it('gives the rows of a window of the ordered result, the later of chooseWindow and setLimit deciding which', () => {
+        const line = new GlideRecord(LINES)
+        line.orderBy('sys_id')
+        line.chooseWindow(1, 3, false)
+        expect(idsOf(line)).toEqual(['l2', 'l3'])
+        line.chooseWindow(3, 9, false)
+        expect(idsOf(line)).toEqual(['l4'])
+        line.chooseWindow(4, 6, false)
+        expect(idsOf(line)).toEqual([])
+        line.setLimit(1)
+        expect(idsOf(line)).toEqual(['l1'])
+        line.chooseWindow(2, 4, false)
+        expect(idsOf(line)).toEqual(['l3', 'l4'])
+    })
+
+    it('orders by the ORDERBY terms of an encoded query, as by orderBy and orderByDesc', () => {
+        const line = new GlideRecord(LINES)
+        line.addEncodedQuery('orderISNOTEMPTY^ORDERBYDESCline_stage^ORDERBYquantity')
+        expect(idsOf(line)).toEqual(['l1', 'l3', 'l2'])
     })
 
     it('fails the test on an operator, a reference or a ^NQ combination it does not know', () => {
@@ -160,6 +181,36 @@ describe('saving', () => {
         expect(saves).toEqual([`update ${LINES} l1`, `update ${LINES} l1`])
     })
 
+    it('stores an assigned journal entry with the save, even when nothing else changed, and fails the test on setValue of one', () => {
+        const order = find(ORDERS, 'o1')
+        expect(() => order.setValue('work_notes', 'lost')).toThrow("setValue('work_notes')")
+        expect(() => order.setValue('comments', 'lost')).toThrow("setValue('comments')")
+        order.work_notes = 'first'
+        order.work_notes = 'second'
+        order.comments = 'to the customer'
+        expect(platform.notesOn('o1')).toEqual([])
+        expect(order.update()).toBe('o1')
+        expect(platform.notesOn('o1')).toEqual(['first', 'second'])
+        expect(platform.journal).toContainEqual({ table: ORDERS, record: 'o1', field: 'comments', value: 'to the customer' })
+        expect(order.getValue('work_notes')).toBeNull()
+        expect(platform.tables[ORDERS][0].sys_updated_on).toBe('2025-11-09 12:00:00')
+
+        const fresh = new GlideRecord(ORDERS)
+        fresh.initialize()
+        fresh.setValue('customer', 'acme')
+        fresh.work_notes = 'raised'
+        expect(platform.notesOn(fresh.insert() ?? undefined)).toEqual(['raised'])
+        expect(() => platform.notesOn('')).toThrow('no sys_id')
+    })
+
+    it('stores no journal entry from a refused save', () => {
+        platform.refuses = () => 'read only'
+        const order = find(ORDERS, 'o2')
+        order.work_notes = 'refused'
+        expect(order.update()).toBeNull()
+        expect(platform.notesOn('o2')).toEqual([])
+    })
+
     it('refuses what the test, a unique index or a table rule refuses, with why', () => {
         platform.uniqueKeys[ORDERS] = 'number'
         platform.constraints[ORDERS] = (row) => (row.customer ? '' : 'Customer is mandatory')
@@ -224,6 +275,43 @@ describe('the rest of the instance', () => {
         expect(current.isNewRecord()).toBe(false)
         expect(recordOf<InstanceType<typeof GlideRecord>>(LINES, {}, { fresh: true }).isNewRecord()).toBe(true)
         expect(platform.tables[LINES]).toHaveLength(4)
+    })
+
+    it('writes nothing of a record a script aborted', () => {
+        const aborted = recordOf<InstanceType<typeof GlideRecord>>(ORDERS, { number: 'ORD9' }, { fresh: true })
+        aborted.setAbortAction(true)
+        expect(aborted.insert()).toBeNull()
+        const stored = find(ORDERS, 'o1')
+        stored.setAbortAction(true)
+        stored.setValue('stage', 'complete')
+        expect(stored.update()).toBeNull()
+        expect(stored.deleteRecord()).toBe(false)
+        expect(platform.tables[ORDERS]).toEqual([expect.objectContaining({ sys_id: 'o1', stage: 'sourcing' }), expect.objectContaining({ sys_id: 'o2' })])
+    })
+
+    it("refuses a record producer's current its own delete, which the row read afresh is allowed", () => {
+        const current = recordOf<InstanceType<typeof GlideRecord>>(ORDERS, { sys_id: 'o1', number: 'ORD1' }, { produced: true })
+        expect(current.deleteRecord()).toBe(false)
+        expect(current.getLastErrorMessage()).toBe(`Error during delete of ${ORDERS} (ORD1)`)
+        expect(find(ORDERS, 'o1').deleteRecord()).toBe(true)
+        expect(platform.tables[ORDERS].map((row) => row.sys_id)).toEqual(['o2'])
+    })
+
+    it('attaches a file to a record as a sys_attachment row, keeps its content and deletes it by sys_id', () => {
+        const attachments = new GlideSysAttachment()
+        const id = attachments.write(find(ORDERS, 'o1'), 'order.csv', 'text/csv', 'a,b\r\n') ?? ''
+        expect(platform.tables.sys_attachment).toEqual([
+            expect.objectContaining({ sys_id: id, table_name: ORDERS, table_sys_id: 'o1', file_name: 'order.csv', content_type: 'text/csv' }),
+        ])
+        expect(platform.attachments).toEqual({ [id]: 'a,b\r\n' })
+
+        platform.refuses = (table) => (table === 'sys_attachment' ? 'no attachment' : '')
+        expect(attachments.write(find(ORDERS, 'o2'), 'order.csv', 'text/csv', '')).toBeNull()
+        platform.refuses = () => ''
+
+        attachments.deleteAttachment(id)
+        expect(platform.tables.sys_attachment).toEqual([])
+        expect(platform.attachments).toEqual({})
     })
 
     it('queues events, logs and reads the clock, the user and the properties the test set', () => {

@@ -170,10 +170,15 @@ function openOnSiteWork(order: GlideRecord, work: OnSiteWork): string | null {
     }
     const opened = openFieldWork(context, work)
     if (!opened) return 'On-site work not opened (see the system log): open it by hand'
-    order.setValue('change_request', opened.changeId)
-    order.setValue('work_order', opened.workOrderId)
+    // Linked on the Order read again: `order` may still hold a carrier and tracking number the platform refused
+    // (platform/shipping `labelOrder`). A save of `order` would write them too, after the user was told they were not
+    // saved, or be refused for them and leave the work unlinked.
+    const stored = findById('x_daas_ham_order', order.getUniqueValue())
+    if (!stored) return 'On-site work opened but not linked to the Order: the Order can no longer be read'
+    stored.setValue('change_request', opened.changeId)
+    stored.setValue('work_order', opened.workOrderId)
     // Unlinked, the next Ship opens the work again; the change and work order name the Order, to link them by hand.
-    return order.update() ? null : `On-site work opened but not linked to the Order: ${refusal(order)}`
+    return stored.update() ? null : `On-site work opened but not linked to the Order: ${refusal(stored)}`
 }
 
 /** What came of a confirmation: how many units the platform refused to move, or why nothing was recorded. */

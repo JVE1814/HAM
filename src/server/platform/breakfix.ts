@@ -1,10 +1,12 @@
 import type { GlideRecord } from '@servicenow/glide'
 import { isAnotherCustomers, replacementProblem, replacementStep } from '../domain/breakfix.ts'
+import { LOCK } from '../domain/lock-names.ts'
 import { ORDER_STAGE, type OrderStage } from '../domain/vocabulary.ts'
 import { isFleetAsset, readStage } from './assets.ts'
+import { withLock } from './locks.ts'
 import { log } from './log.ts'
 import { createOrder, submitOrder } from './orders.ts'
-import { bool, findById, refusal, str, warnRefused, type ForeignRecord } from './records.ts'
+import { addWorkNote, bool, findById, refusal, str, warnRefused, type ForeignRecord } from './records.ts'
 
 /**
  * Break-fix replacements (P2.3, Q58): the device-replace Order a CSM case raises for its failed Asset. It tells the
@@ -52,10 +54,25 @@ function notRaised(why: string): Replacement {
  * the user to correct. "Raise replacement" is offered while the case links no Order or one rejected or cancelled, but
  * a form opened before then can still send it: then a linked draft is submitted again and a linked Order going ahead
  * is kept.
+ * Two presses at once would each find the case linking no Order and raise one each, so the Order is raised, linked and
+ * submitted holding the case's job lock (domain/lock-names `replacementCase`, ADR 0013); a press that finds it held
+ * raises nothing and says so. Taking the lock throws only when an insert is refused with no lock row (platform/locks):
+ * that error escapes.
  */
 export function raiseReplacement(kase: GlideRecord): Replacement {
     if (!kase.update()) return notRaised('')
-    const linked = findById('x_daas_ham_order', str(kase, 'x_daas_ham_replacement_order'))
+    const raising = withLock(LOCK.replacementCase(kase.getUniqueValue()), () => raiseHolding(kase))
+    return raising.ran ? raising.value : notRaised('A replacement is being raised for this case. Reload the case to see its Order')
+}
+
+/**
+ * The raise, holding the case's lock. The Order the case links is read from the stored case, not from `kase`: a press
+ * that held the lock before this one may have linked its Order after this form's case was read.
+ */
+function raiseHolding(kase: GlideRecord): Replacement {
+    const stored = findById('sn_customerservice_case', kase.getUniqueValue())
+    if (!stored) return notRaised('The case can no longer be read')
+    const linked = findById('x_daas_ham_order', str(stored, 'x_daas_ham_replacement_order'))
     const step = replacementStep(linked ? (str(linked, 'stage') as OrderStage) : null)
     if (linked && step === 'submit_draft') return submitReplacement(linked)
     if (linked && step === 'keep') {
@@ -123,6 +140,6 @@ export function noteReplacementComplete(orderId: string): void {
     const kase = findById('sn_customerservice_case', caseId)
     if (!kase) return void log.warn(`${str(order, 'number')} complete, but its case ${caseId} was not found: save the case to stop its SLA`)
     if (!bool(kase, 'active') || str(kase, 'x_daas_ham_replacement_order') !== order.getUniqueValue()) return
-    kase.setValue('work_notes', `Replacement order ${str(order, 'number')} is complete: the replacement is installed.`)
+    addWorkNote(kase, `Replacement order ${str(order, 'number')} is complete: the replacement is installed.`)
     if (!kase.update()) warnRefused(kase, `${str(kase, 'number')}: replacement SLA not stopped, the case save was refused; save the case`)
 }

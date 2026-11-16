@@ -3,7 +3,7 @@ import type { OnSiteWork } from '../domain/delivery.ts'
 import { checkJobWindow } from '../domain/scheduling.ts'
 import type { FieldPurpose } from '../domain/vocabulary.ts'
 import { glideToMs } from './clock.ts'
-import { findById, str, warnRefused, type ForeignRecord } from './records.ts'
+import { addWorkNote, findById, str, warnRefused, type ForeignRecord } from './records.ts'
 
 /**
  * On-site work: an FSM work order (wm_order) and the change request it runs under (Q57), and whether the work as
@@ -46,7 +46,7 @@ export function openFieldWork(context: WorkContext, job: FieldJob): FieldWork | 
     workOrder.setValue('x_daas_ham_purpose', job.purpose)
     workOrder.setValue('initiated_from', context.sourceId)
     workOrder.setValue('parent', changeId)
-    if (job.subcontracted) workOrder.setValue('work_notes', 'Dispatch to subcontractor / remote hands.')
+    if (job.subcontracted) addWorkNote(workOrder, 'Dispatch to subcontractor / remote hands.')
     const workOrderId = workOrder.insert()
     if (!workOrderId) {
         warnRefused(workOrder, `No work order for ${context.description} (${str(change, 'number')} has none, cancel it)`)

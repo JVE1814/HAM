@@ -23,7 +23,7 @@ import { createOrder, submitOrder } from './orders.ts'
 import { withLock } from './locks.ts'
 import { intProperty } from './properties.ts'
 import { PROPERTY } from '../domain/properties.ts'
-import { pluck, str, warnRefused } from './records.ts'
+import { addWorkNote, pluck, str, warnRefused } from './records.ts'
 import { OPEN_ORDERS_QUERY } from '../domain/fulfilment.ts'
 import { log } from './log.ts'
 
@@ -148,7 +148,7 @@ function raiseWave({ customerId, siteId, agreementId, assets }: RefreshWave): st
     }
     const order = raised.order
     if (unmatched.size > 0) {
-        order.setValue('work_notes', `${unmatched.size} asset(s) have no sellable catalogued successor; their lines reuse the current model. Review before submitting.`)
+        addWorkNote(order, `${unmatched.size} asset(s) have no sellable catalogued successor; their lines reuse the current model. Review before submitting.`)
         // Without the note nothing tells the account manager why the Order is a draft.
         if (!order.update()) warnRefused(order, `Refresh Order ${number}: note on its ${unmatched.size} unmatched asset(s) not saved`)
         return number

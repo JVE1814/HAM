@@ -2,8 +2,10 @@ import { describe, expect, it } from 'vitest'
 import type { HttpRequest } from './http'
 import {
     applyTracking,
+    boundedTracking,
     buyLabel,
     labelVoidable,
+    MAX_TRACKING_EVENTS,
     newTrackingEvents,
     newestEventAt,
     OPEN_SHIPMENTS,
@@ -16,7 +18,9 @@ import {
     trackingRetryParams,
     voidedLabelOrderNote,
     WEBHOOK_TOKEN_HEADER,
+    WEBHOOK_TOKEN_MIN_LENGTH,
     webhookToken,
+    webhookTokenUsable,
     type Address,
     type LabelInput,
     type TrackingEvent,
@@ -687,10 +691,53 @@ describe('webhookToken', () => {
 })
 
 describe('tokenMatches', () => {
-    it('matches only the configured, non-empty secret', () => {
-        expect(tokenMatches('s3cret', 's3cret')).toBe(true)
-        expect(tokenMatches('s3creT', 's3cret')).toBe(false)
-        expect(tokenMatches('s3cre', 's3cret')).toBe(false)
+    const SECRET = 's3cret-'.padEnd(WEBHOOK_TOKEN_MIN_LENGTH, 'x')
+
+    it('matches only the configured secret', () => {
+        expect(tokenMatches(SECRET, SECRET)).toBe(true)
+        expect(tokenMatches(`${SECRET.slice(0, -1)}X`, SECRET)).toBe(false)
+        expect(tokenMatches(SECRET.slice(0, -1), SECRET)).toBe(false)
         expect(tokenMatches('', '')).toBe(false)
+    })
+
+    it('matches no token while the configured secret is shorter than the minimum, as while it is empty', () => {
+        const short = SECRET.slice(0, WEBHOOK_TOKEN_MIN_LENGTH - 1)
+        expect(WEBHOOK_TOKEN_MIN_LENGTH).toBe(32)
+        expect(webhookTokenUsable(SECRET)).toBe(true)
+        expect(webhookTokenUsable(short)).toBe(false)
+        expect(webhookTokenUsable('')).toBe(false)
+        expect(tokenMatches(short, short)).toBe(false)
+    })
+})
+
+describe('boundedTracking', () => {
+    const at = (minute: number) => new Date(Date.UTC(2026, 10, 6, 8, minute)).toISOString()
+    const scan = (minute: number): TrackingEvent => ({ occurredAt: at(minute), status: 'in_transit', description: `Scan ${minute}`, location: '' })
+    const updateOf = (events: TrackingEvent[]): TrackingUpdate => ({ trackingNumber: '1Z999', status: 'in_transit', description: 'On its way', events })
+
+    it('leaves an update within the cap as it is', () => {
+        const few = updateOf([scan(1), scan(2)])
+        expect(boundedTracking(few)).toEqual({ update: few, dropped: 0 })
+        const full = updateOf(Array.from({ length: MAX_TRACKING_EVENTS }, (_unused, minute) => scan(minute)))
+        expect(boundedTracking(full)).toEqual({ update: full, dropped: 0 })
+    })
+
+    it('keeps the newest events of a longer one, in the order they were listed, and says how many it left out', () => {
+        // Listed newest first, as an aggregator may list them: the two oldest come last.
+        const listed = Array.from({ length: MAX_TRACKING_EVENTS + 2 }, (_unused, index) => scan(MAX_TRACKING_EVENTS + 1 - index))
+        const bounded = boundedTracking(updateOf(listed))
+        expect(bounded.dropped).toBe(2)
+        expect(bounded.update.events).toEqual(listed.slice(0, MAX_TRACKING_EVENTS))
+        expect(newestEventAt(bounded.update.events)).toBe(newestEventAt(listed))
+        expect(bounded.update).toMatchObject({ trackingNumber: '1Z999', status: 'in_transit', description: 'On its way' })
+    })
+
+    it('leaves out undated events first, and of two at the same time the one listed earlier', () => {
+        const undated: TrackingEvent = { occurredAt: '', status: 'unknown', description: 'Undated note', location: '' }
+        const first = { ...scan(1), description: 'Listed first' }
+        const second = { ...scan(1), description: 'Listed second' }
+        const bounded = boundedTracking(updateOf([undated, first, second, scan(2)]), 2)
+        expect(bounded.dropped).toBe(2)
+        expect(bounded.update.events).toEqual([second, scan(2)])
     })
 })

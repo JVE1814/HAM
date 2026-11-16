@@ -774,6 +774,11 @@ Sources:
 | ATF *Record Validation* on a date field | The ATF tests check a date with the `ON` form, `endsON2028-01-31@javascript:gs.dateGenerate('2028-01-31','start')@javascript:gs.dateGenerate('2028-01-31','end')` (`src/fluent/leases/tests.now.ts`) | The step matches the record loaded in memory against the condition, not the database, and there a date `=` a literal day is shifted by the session time zone; `ON` matches the day in every time zone | matches | N42 |
 | A row inserted into an import-set table outside an import set | The app processes its import rows by business rule and ships no transform map (ADR 0018); an ATF test that inserts such a row does not fail on server errors and checks the outcome (`src/fluent/models/tests.now.ts`) | The platform transforms the row at once and, where the table has no transform map, logs the error *Transform map record not provided, transform stopped*; the insert is written and the app's rule runs | matches | N43 |
 | `gs.getPropertySecured` and a password2 property's read roles | Every secret is read with `gs.getProperty` (`platform/properties.ts` secretProperty), not `gs.getPropertySecured`; each declares read and write roles `admin`; the tracking webhook reads its token as guest, and *Ship* and *Create return label* read the ShipEngine key as asset managers or inventory techs | Not documented (only the signature in the typings). On an instance `getPropertySecured` checks the property's read roles against the session user and gives a non-admin the default; `getProperty` gives everyone the stored value | matches | N44, N45 |
+| A work note on a task-extended table | A note is added by assigning `work_notes` (`platform/records.ts` addWorkNote) and stored by the next insert or update, even one that changes nothing else | `setValue('work_notes', x)`, `setValue('comments', x)` and `getElement(f).setValue(x)` store nothing, in global and in `x_daas_ham`: the field reads back blank and a save with nothing else changed writes nothing yet returns the sys_id. Assignment stores one journal entry per assignment. `setJournalEntry` and `setDisplayValue` are refused in `x_daas_ham`. A journal field reads blank once read or saved | matches | N46 |
+| A record producer request refused before its insert | A Customer contact's request is refused in the producer's own script (`entry/orders` beforeOrderProduced, `entry/returns` beforeReturnProduced), before the before-insert rules that refuse every other insert | Refused by a before-insert business rule, the platform still writes the request's answers to `question_answer` and skips the post-insert script. Refused by `current.setAbortAction(true)` in the producer's script, it writes no answer and skips the post-insert script. That script sees the mapped values. `question_answer` is global with *Can delete* off and the app holds no privilege on it | matches | N48 |
+| Who may open a record producer | Each producer is *Available for* one user criterion with the app's requester roles in its role list and the service desk's matched by name in its script (`shared/roles.now.ts` producerRequesters); the platform's *Not available for: SNC External* is removed by an admin in global scope after the install (README "Install"); the preflight check reports a producer that still has a *Not available for* row | The platform adds *Not available for: SNC External* in the insert of every catalog item, and again whenever one is left with no criterion; *Not available for* wins over *Available for*. The row is in no update set, the update loader deletes by sys_id only, `Now.del` by keys mints a new sys_id, and `x_daas_ham` may not delete from `sc_cat_item_user_criteria_no_mtom`. A role's sys_id differs between instances (roles coalesce on name) | matches (the criterion's script was not run on an instance) | N49 |
+| Deleting a record producer's own record | A record its post-insert script refuses is deleted read again by its sys_id (`platform/records.ts` removeStored), not through the script's `current` | `current.deleteRecord()` in the post-insert script returns false, as admin too, with *Error during delete of ...* and a NullPointerException in `com.glide.db.PrimaryKey.getValue`; the row stays. A GlideRecord read by the same sys_id deletes it | matches | N47 |
+| Who reads a platform table the app's records point at | Provider staff read `customer_account` and its `name`, the broad staff `core_company`, `cmdb_ci` and `proc_po`, through the app's Allow-If ACLs on those global tables (`shared/platform-access.now.ts`, `orders/access.now.ts`, `assurance/access.now.ts`); field ACLs on the Agreement and Lease schedule tables, for read and query_range, replace `ast_contract`'s and name every role that reads each field (`agreements/access.now.ts`, `leases/access.now.ts`); the workspace audience check judges platform tables by the ACLs recorded in `src/server/test-support/platform-acls.ts` | A reference shows, and is searched or grouped by, only when the reader reads its table and that table's display field. `customer_account`'s ACLs name Customer Service and CRM roles only; `core_company`, `cmdb_ci` and `proc_po` name roles inside the platform's `asset`, which the NOC, account managers and finance do not hold. `ast_contract.*` read and query_range need `contract_manager`; `number`, `short_description`, `state`, `starts` and `ends` read also pass the service desk (`sn_esm_agent`) and Customer admins (`sn_esm_user`, held through `sn_customerservice.customer`), so the Agreement's field ACLs for those five name Customer admins too; `starts`, `vendor`, `vendor_contract` query_range need `contract_manager`. A field is decided at the most specific level with an ACL for it, ORed within the level: field on the table, on each parent, `*.<field>`, then `*` on the table and each parent. Every other field's query_range is public (`*.<field>`). An app-scoped ACL on a global table installs in the app's scope | matches (emulated with app-scoped ACLs made by REST on the instance, not installed from the build) | N50 |
 
 Notes:
 
@@ -843,7 +848,8 @@ Notes:
   controls updates to "the discovery_source and last_discovered fields".
 - **Attachments.** `write(GlideRecord record, String fileName, String contentType, String content)`
   "Attaches a specified attachment to the specified record" and returns the sys_id, or null if not
-  added (the app ignores the return value). `deleteAttachment(String attachmentID)` returns void. The
+  added (the app logs a CSV export that returns none as failed, `platform/billing.ts`
+  `attachExport`). `deleteAttachment(String attachmentID)` returns void. The
   `@servicenow/glide` 27.0.5 typings match. `sys_attachment` in the SDK: `file_name` (String, max 100),
   `table_name` (String, max 80), `table_sys_id`, `content_type`.
 - **queryParams.** `RESTAPIRequest.queryParams` type "Array": "The query parameters from the web
@@ -1093,6 +1099,91 @@ Sources:
   app's properties are in `x_daas_ham`: *NaaS - the tracking webhook needs its token and records a
   delivery once* posts the delivery unauthenticated with the token, so it shows the scoped read as
   guest ([verify-on-instance.md](../verify-on-instance.md#atf-route-tests)).
+- N46: development instance, 2026-11-12, background scripts in global and in `x_daas_ham` on
+  `x_daas_ham_return_order`, `x_daas_ham_order` and `sn_customerservice_case`, and in `x_daas_ham`
+  through the deployed `records` module. After `setValue('work_notes', x)` (and `comments`, and
+  through `getElement`, with or without `setWorkflow(false)`), `getValue` gave `''`, `update()`
+  returned the sys_id, `sys_mod_count` stayed the same and `sys_journal_field` got no entry, on
+  insert and on update. After `gr.work_notes = x` the update raised `sys_mod_count` by one and
+  `sys_journal_field` got the entry; two assignments before one save gave two entries. The daily job
+  *NaaS - chase overdue returns* closed a Return with no line and stored no note. A fresh `get` read
+  `work_notes` as `''`. The test records and the cross-scope privileges the runs granted were
+  deleted afterwards.
+- N47: development instance, 2026-11-12. Through the deployed producers, as a service desk agent
+  (a Return for a Site of another Customer), as a user with no NaaS role (an Order) and as admin (a
+  Return), the app's `current.deleteRecord()` failed: the Return and Order orders stayed open with
+  their answers, the system log had *Error during delete of ...* with a NullPointerException in
+  `com.glide.db.PrimaryKey.getValue`, then the app's *not removed* warning. On a copy of a producer
+  writing `sys_user_preference`, `current.deleteRecord()` in the post-insert script returned false
+  and the row stayed; a `GlideRecord` read by `current`'s sys_id there returned true and the row was
+  gone. In `x_daas_ham`, admin deleted one of the kept Orders read the same way. Each answer of a
+  deleted record stays: `question_answer.table_sys_id` is a plain string and nothing removes them.
+  The test records were deleted afterwards.
+- N48: development instance, 2026-11-12, a copy of a producer writing `sys_user_preference` with one
+  variable, submitted through `/api/sn_sc/servicecatalog/items/{id}/submit_producer` as a service
+  desk agent. Kept: one `question_answer` row for the new record, and the post-insert script logged.
+  A global before-insert rule calling `current.setAbortAction(true)`: the submit answered sys_id
+  `-1`, one `question_answer` row was written for a sys_id never stored, and the post-insert script
+  logged nothing. `current.setAbortAction(true)` in the producer's script: sys_id `-1`, no answer,
+  no post-insert log. With the variable mapped to a field, the producer's script read the posted
+  value from `current`. `sys_db_object` of `question_answer`: global, *Can delete* off. With the
+  app's before-insert rules, a refused contact request left 6 answers per Return and 9 per Order.
+  The test records were deleted afterwards.
+- N49: development instance, 2026-11-12, `GET /api/sn_sc/servicecatalog/items/{id}`,
+  `submit_producer` and `sn_sc.CatItem.canView()` under impersonation, and background scripts on
+  copies of a producer. The deployed producers' only criterion was *Not available for: SNC
+  External*, created by admin in the same second as each item; a customer admin got HTTP 400
+  (*security constraints prevent access*) for both. A new item got the row in its insert's own
+  transaction, also with `setWorkflow(false)` and also when an *Available for* row naming its sys_id
+  was inserted first; no business rule or `glide.sc.*` property adds it. Deleting it with no other
+  criterion brought it back at once; with an *Available for* row it stayed deleted, through updates
+  of the item. With both rows, the customer admin, a site contact, an agent and a plain internal user
+  were all refused. With *Available for* one criterion of the roles asset manager, account manager,
+  NOC, customer admin and `sn_customerservice_agent` and *SNC External* deleted: customer admin and
+  agent HTTP 200, site contact and a user with `snc_internal` only HTTP 400. Through
+  `GlideUpdateManager2.loadXML`, a DELETE naming the row's keys under a new sys_id left it, one
+  naming its sys_id deleted it. From `x_daas_ham` the delete was refused by the table's cross-scope
+  access policy. ServiceNow KB1383355: `sys_user_role` records coalesce on name, so a role's sys_id
+  differs between instances, and a list field of role sys_ids that do not resolve grants nothing.
+  The test records were deleted afterwards.
+- N50: development instance, 2026-11-12 and 13, the Table and Stats APIs as one test user per
+  provider role (its role and `snc_internal`), the ACL records read as admin. Every reference a
+  workspace list column, search, filter or group-by reaches, read with `sysparm_limit=1` as each
+  role: `customer_account` 403 for all six staff roles and the app admin; `core_company`, `cmdb_ci`
+  and `proc_po` 403 for the NOC, account managers and finance; `sn_customerservice_case` 403 for
+  all; `cmn_location`, `sys_user`, `cmdb_model`, `alm_stockroom` read by all. `customer_account`'s
+  read ACLs (CRM Base Entities) name `csm_ws_integration`, `sn_crm_account_viewer`,
+  `sn_customerservice.customer_data_viewer`, `sn_customerservice_agent`, `contact_manager`,
+  `customer` and a granular role; `customer_account.name` the same roles; its two Deny-Unless ACLs
+  pass every signed-in user. The platform's `asset` contains `contract_manager`, `cmdb_read`,
+  `procurement_user`, `inventory_user` and `model_manager`. An Agreement read as finance or an
+  account manager came back with no field at all; as an asset manager with every field. An
+  app-scoped Allow-If read ACL on `customer_account` for finance gave the group-by its display
+  value, but the column stayed out and `customer.nameLIKE` was refused until a
+  `customer_account.name` ACL was added; `phone`, `street` and `city` stayed out, read directly or
+  through `core_company`. An `x_daas_ham_agreement.*` read ACL for finance gave it the app's
+  columns, the currency and the Customer, not `number`, `state`, `starts` or `ends`, which an
+  `x_daas_ham_agreement.starts` ACL then gave `starts`; the finance-only `*` ACL took the currency,
+  the Customer and the app's columns from the asset manager. The service desk read `number`,
+  `short_description`, `state`, `starts` and `ends` of an Agreement and nothing else of it. Those five
+  fields' CRM Base Entities read ACLs (roles `snc_internal`, `sn_esm_user`,
+  `sn_customerservice.requester`) script `gs.hasRole` of `contract_manager`, `sn_esm_user`,
+  `sn_esm_agent`, `sn_customerservice.requester`, on all but `number`
+  `sn_customerservice.customer_data_viewer`, or a Subscription contract model, which no Agreement has.
+  `sn_customerservice_agent` contains `sn_esm_agent`; `sn_customerservice.customer` contains
+  `sn_esm_user` and `snc_external`. The Customer admin test user, a `customer_contact` with
+  `sn_customerservice.customer` and no `snc_internal`, passes those ACLs for all five fields; the app's
+  first Agreement field ACLs named staff only and replaced them, and `canRead` on `number` was false as
+  that user (2026-11-13). The
+  query_range ACLs: `ast_contract.*`, `.starts`, `.vendor`, `.vendor_contract` and `.po_number`
+  need `contract_manager`; `*.<field>` ones are public for some 175 common field names. With the
+  app's 25 ACLs emulated (19 read, 6 query_range) a sweep of every list's columns, search and sort
+  and every widget, for the seven roles, went from 270 refused or blank requests of 3237 to 9 of
+  3178: the search of *Open replacement orders* through its case (`sn_customerservice_case`) for
+  all, and of *Unbilled fees* through its Billing period for field techs and the NOC. App ACLs the
+  build installed on `alm_asset`, `alm_stockroom` and `alm_transfer_order` are in `x_daas_ham`
+  scope though `sys_db_object.create_access_controls` is false on each; a background script in
+  `x_daas_ham` could not create one (the table's cross-scope access policy refused it). The test records were deleted afterwards.
 
 ## Changes needed in the app
 

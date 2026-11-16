@@ -11,6 +11,7 @@ import { num, refusal, str } from './records.ts'
  * - an event job whose passes replace each other (`JOB.margin`, `JOB.billingGenerate`): the current pass's token;
  * - `JOB.providerTagSequence` (platform/tags): the last Provider tag number issued;
  * - `JOB.oemClaimStranded` (platform/claim-steps): the last waiting step a claim run checked, '' once it checked them all;
+ * - `JOB.endedAgreementReturns`, `JOB.temporaryOrderReturns` (platform/scheduled-returns): the last record a run read, '' once it read them all;
  * - `JOB.preflight` (entry/preflight): nothing, its result is the row's `last_status`.
  */
 const TABLE = 'x_daas_ham_job_cursor'

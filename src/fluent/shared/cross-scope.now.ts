@@ -534,3 +534,31 @@ CrossScopePrivilege({
     targetScope: 'global',
     targetType: 'sys_db_object',
 })
+
+// The preflight check reports a record producer the platform still keeps from a criterion (entry/preflight).
+CrossScopePrivilege({
+    $id: Now.ID['xsp_sc_cat_item_user_criteria_no_mtom_read'],
+    operation: 'read',
+    status: 'allowed',
+    targetName: 'sc_cat_item_user_criteria_no_mtom',
+    targetScope: 'global',
+    targetType: 'sys_db_object',
+})
+
+CrossScopePrivilege({
+    $id: Now.ID['xsp_sc_cat_item_read'],
+    operation: 'read',
+    status: 'allowed',
+    targetName: 'sc_cat_item',
+    targetScope: 'global',
+    targetType: 'sys_db_object',
+})
+
+CrossScopePrivilege({
+    $id: Now.ID['xsp_user_criteria_read'],
+    operation: 'read',
+    status: 'allowed',
+    targetName: 'user_criteria',
+    targetScope: 'global',
+    targetType: 'sys_db_object',
+})

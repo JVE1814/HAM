@@ -181,3 +181,14 @@ Acl({
     operation: 'delete',
     roles: [admin],
 })
+
+// The platform lets cmdb_read and service_viewer read configuration items, which the NOC, account managers and finance
+// do not hold: a Reconciliation exception's configuration item would show blank to them.
+Acl({
+    $id: Now.ID['acl_cmdb_ci_read_staff'],
+    type: 'record',
+    table: 'cmdb_ci',
+    operation: 'read',
+    roles: BROAD_STAFF,
+    description: 'NaaS provider staff read the configuration items a Reconciliation exception names.',
+})

@@ -71,6 +71,11 @@ Assets are made by the app's own `newAsset` (`platform/assets.ts`), in turn over
 (`C9300-48P-E`, `MR46-HW`, `FG-60F`), so the demo data must be loaded first. Inserts run with
 business rules on, as the demo data's do.
 
+The scripts name their columns, choice values and the stage as texts. `npm test` runs the dry run
+and holds every name to the built app (`src/server/built-metadata.test.ts`): a column that is
+renamed, or a choice or stage that is dropped, fails there before a run on an instance. The values
+of platform columns (an Agreement's `state`) are not checked.
+
 A fleet of 200,000 is for example `customers: 100, sitesPerCustomer: 40, assetsPerSite: 50`. The
 serial format allows 9999 Customers, 999 Sites a Customer and 9999 assets a Site.
 

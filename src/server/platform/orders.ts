@@ -17,6 +17,7 @@ import { LONG_HOLD_LOCK_TRIES, REQUEUE, type HeldLock } from '../domain/job-lock
 import { LOCK } from '../domain/lock-names.ts'
 import { cancelledUnit, type LineExit } from '../domain/stock.ts'
 import { type EntitlementVerdict, type InstallMode, LINE_STAGE, ORDER_STAGE, type OrderType } from '../domain/vocabulary.ts'
+import { isCustomerContact } from '../domain/visibility.ts'
 import { entitlementContext } from './agreements.ts'
 import {
     cancelPendingApprovals,
@@ -31,8 +32,8 @@ import { readStage } from './assets.ts'
 import { orderShipment } from './fulfilment.ts'
 import { withLock, withLockTries } from './locks.ts'
 import { addOrderLines, saveLineStage, withOrderLineLocks, type NewLine, type RefusedLine } from './order-lines.ts'
-import { bool, findById, num, refusal, str, warnRefused } from './records.ts'
-import { creatorOf } from './session.ts'
+import { addWorkNote, bool, findById, num, refusal, removeStored, str, warnRefused } from './records.ts'
+import { creatorOf, currentSession } from './session.ts'
 import { queueSourcing, queueSubmissionAgain } from './sourcing-requests.ts'
 import { skipOpenStagingTasks } from './staging-tasks.ts'
 import { leaveOrderLine } from './stock.ts'
@@ -43,14 +44,6 @@ import { log } from './log.ts'
  * None of it tells the user anything: each gives what came of it, for the trigger that asked (a form button, the
  * record producer, the refresh job) to report.
  */
-
-/**
- * Remove an Order raised in vain (one its raiser may not raise, or none of whose lines was saved): why the platform
- * kept it ('' once removed), for the caller to name it for cancelling.
- */
-function removeOrder(order: GlideRecord): string {
-    return order.deleteRecord() ? '' : refusal(order, 'the delete was refused')
-}
 
 export interface NewOrder {
     orderType: OrderType
@@ -95,7 +88,7 @@ export function createOrder(header: NewOrder, lines: readonly NewLine[]): OrderC
     if (!order.insert()) return { created: false, step: 'order', reason: refusal(order) }
     const refused = addOrderLines(order, lines)
     if (refused.length < lines.length) return { created: true, order, refused }
-    return { created: false, step: 'lines', number: str(order, 'number'), refused, kept: removeOrder(order) }
+    return { created: false, step: 'lines', number: str(order, 'number'), refused, kept: removeStored(order) }
 }
 
 /**
@@ -116,6 +109,8 @@ function notSubmitted(why: string): Submission {
  * not its Customer's stays a draft to correct, without the lines of a Site template not offered to it, and so does one
  * missing a line the platform refused (logged), or whose devices could not be read (`devicesUnread` says why, '' when
  * they were; logged): it would be assessed and sourced short of what was asked for.
+ * A Customer contact's Order that names records not its Customer's never gets here: the before-insert rule refuses it
+ * (`contactOrderInsertRefusal`).
  */
 export function submitProducedOrder(order: GlideRecord, devices: readonly NewLine[], devicesUnread: string): Submission {
     const parties = orderParties(order)
@@ -123,8 +118,8 @@ export function submitProducedOrder(order: GlideRecord, devices: readonly NewLin
     const number = str(order, 'number')
     const mayNot = raiserRefusal(parties.customerId, raiser)
     if (mayNot) {
-        const kept = removeOrder(order)
-        if (kept) warnRefused(order, `${number} not removed (${mayNot}), cancel it`)
+        const kept = removeStored(order)
+        if (kept) log.warn(`${number} not removed (${mayNot}), cancel it: ${kept}`)
         return { submitted: false, message: `Order not raised. ${mayNot}.` }
     }
     const fromTemplate = parties.siteTemplate && siteTemplateOffered(parties) ? siteTemplateLines(parties.siteTemplate.id) : []
@@ -174,6 +169,22 @@ function orderParties(order: GlideRecord): OrderParties {
 }
 
 /**
+ * Why the Order `current`, about to be inserted, is refused, or null: the check of the before-insert rule
+ * (entry/orders `guardContactOrder`). In a Customer contact's session it must pass what Submit checks
+ * (domain/entitlement `ownershipFindings`): their own Customer, with an Agreement and a Site of that Customer and a
+ * Site template offered to it, whatever inserts it: the record producer, a form or the Table API. The customer
+ * admins' create ACL looks at the Customer only. Whether the create rule lets the contact in is that ACL's question,
+ * and the producer's (`submitProducedOrder`); a site contact raises no Order. Anyone else (provider staff, the
+ * service desk, a job) raises Orders for any Customer, and theirs stays a draft to correct.
+ */
+export function contactOrderInsertRefusal(current: GlideRecord): string | null {
+    const { scope, customerId } = currentSession()
+    if (!isCustomerContact(scope)) return null
+    const findings = ownershipFindings(orderParties(current), { mayRaise: true, scope, customerId })
+    return findings.length > 0 ? `Order not raised. ${findings.join('. ')}.` : null
+}
+
+/**
  * Submit a draft Order (the form's Submit, a break-fix or refresh Order just raised): it goes ahead, to approval or
  * sourcing, also when another submission of it took it ahead; otherwise it stays a draft.
  */
@@ -184,7 +195,7 @@ export function submitOrder(order: GlideRecord): Submission {
 function submitAsRaised(order: GlideRecord, parties: OrderParties, raiser: Orderer, unsaved: string[], tries: number): Submission {
     const findings = [...ownershipFindings(parties, raiser), ...unsaved]
     if (findings.length === 0) return submitAccepted(order, tries)
-    order.setValue('work_notes', `Not submitted:\n${findings.join('\n')}`)
+    addWorkNote(order, `Not submitted:\n${findings.join('\n')}`)
     // A refresh Order the daily job raised has only this note to say why it is a draft.
     if (!order.update()) warnRefused(order, `${str(order, 'number')} not submitted (${findings.join('; ')}), and its note not saved`)
     return { submitted: false, message: `Order not submitted. ${findings.join('. ')}.` }
@@ -260,7 +271,7 @@ function submitHolding(usageLock: HeldLock | null, order: GlideRecord): Submissi
         return { submitted: true }
     }
     if (asked.step === 'save') return notSubmitted(asked.reason)
-    order.setValue('work_notes', `Not submitted: ${asked.reason}`)
+    addWorkNote(order, `Not submitted: ${asked.reason}`)
     if (!order.update()) warnRefused(order, `${str(order, 'number')} not submitted (${asked.reason}), and its note not saved`)
     return notSubmitted(`${asked.reason}.`)
 }
@@ -301,7 +312,7 @@ function submitLater(order: GlideRecord, tries: number): Submission {
 }
 
 function noteDraft(order: GlideRecord, note: string): void {
-    order.setValue('work_notes', note)
+    addWorkNote(order, note)
     if (!order.update()) warnRefused(order, `${str(order, 'number')} left a draft, its note not saved (${note})`)
 }
 
@@ -527,7 +538,7 @@ function cancelHolding(
     const purchases = openPurchaseOrders(order.getUniqueValue())
     order.setValue('stage', ORDER_STAGE.cancelled)
     order.setValue('state', ORDER_TASK_STATE.cancelled)
-    if (purchases.length > 0) order.setValue('work_notes', `Cancel these purchase orders in Procurement: ${purchases.join(', ')}`)
+    if (purchases.length > 0) addWorkNote(order, `Cancel these purchase orders in Procurement: ${purchases.join(', ')}`)
     if (!order.update()) return notCancelled(warnRefused(order, `${str(order, 'number')} not cancelled`))
     const complete = cancelOpenLines(order.getUniqueValue(), lineIds)
     // A cancel that outlasted a lock (ADR 0013) may have overlapped the pass or Ship that took it over. A pass skips

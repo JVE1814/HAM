@@ -1,6 +1,7 @@
 import type { GlideRecord } from '@servicenow/glide'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { afterOrderProduced } from './orders.ts'
+import { ROLE } from '../domain/roles.ts'
+import { afterOrderProduced, beforeOrderProduced } from './orders.ts'
 import { submitProducedOrder, type Submission } from '../platform/orders.ts'
 import { platform, recordOf } from '../test-support/fake-glide.ts'
 
@@ -9,7 +10,8 @@ vi.mock('../platform/orders.ts', async (original) => ({ ...(await original<typeo
 
 function produce(submission: Submission): string[] {
     vi.mocked(submitProducedOrder).mockReturnValue(submission)
-    afterOrderProduced({ devices: '' }, recordOf<GlideRecord>('x_daas_ham_order', { sys_id: 'order1', number: 'ORD0001' }))
+    platform.tables.x_daas_ham_order = [{ sys_id: 'order1', number: 'ORD0001' }]
+    afterOrderProduced({ devices: '' }, recordOf<GlideRecord>('x_daas_ham_order', { sys_id: 'order1', number: 'ORD0001' }, { produced: true }))
     return platform.messages
 }
 
@@ -28,5 +30,27 @@ describe('afterOrderProduced', () => {
 
     it('says nothing of an Order that went ahead', () => {
         expect(produce({ submitted: true })).toEqual([])
+    })
+
+})
+
+describe('beforeOrderProduced', () => {
+    const produce = () => {
+        const current = recordOf<GlideRecord>('x_daas_ham_order', { customer: 'other' }, { fresh: true, produced: true })
+        beforeOrderProduced({ devices: '' }, current)
+        return current.insert()
+    }
+
+    it("refuses a Customer contact's request before its Order is inserted, as the insert rule would", () => {
+        platform.user = { id: 'producing-admin', name: 'Ada', company: 'acme', roles: [ROLE.customerAdmin], interactive: true }
+        expect(produce()).toBeNull()
+        expect(platform.messages).toEqual(['error Order not raised. You can only order for your own customer.'])
+        expect(platform.tables.x_daas_ham_order ?? []).toEqual([])
+    })
+
+    it('lets provider staff save a draft for any Customer, to correct', () => {
+        platform.user = { id: 'producing-staff', name: 'Max', company: 'provider', roles: [ROLE.assetManager], interactive: true }
+        expect(produce()).not.toBeNull()
+        expect(platform.messages).toEqual([])
     })
 })

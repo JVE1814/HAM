@@ -4,11 +4,34 @@
 
 - **Service intervals** record the days each Asset delivered a Subscription line. A rule on stage
   changes opens one when the Asset enters service (in service or temporary): from its in-service
-  date on first go-live, else that day (e.g. a missing unit found again). The same rule closes it
+  date on first go-live (the first sighting since its install, also when the go-live was put off
+  to a later sighting: fulfilment spec, *In service and billing start*), else that day (e.g. a
+  missing unit found again). The same rule closes it
   the day the Asset leaves service (a Return order, declared missing, a manual move). Both days are
   billed. An Asset back in service on or before the day its interval on the same line closed gets
   that interval reopened, so no day is billed twice. The rule also runs when the stage change clears
   the Asset's Subscription line, so the interval still closes.
+- An interval that has not started yet when its Asset leaves service is removed, not closed. An
+  Asset back in service at another line or Site on the day its interval closed gets its new
+  interval from the day after, so that day is billed once. If it leaves service again that same
+  day, the new interval has delivered no day. Closing it would bill its first day, a day the Asset
+  was not in service, so the rule deletes it. A delete the platform refuses is logged as a warning,
+  as a refused close is, and the interval stays open, to remove by hand.
+- A Service interval records its Asset's Subscription line and Site once, as it opens. So the rule
+  also runs when the Subscription line or the Site of a fleet asset is changed, and moves the
+  interval of a unit that stays in service (an asset manager may change a unit's line by hand, ADR
+  0005). The interval at the old line or Site ends that day, which it bills as any last day. The
+  interval at the new line and Site starts the day after, so no day is billed twice. A unit in
+  service given its first line gets an interval from that day. One whose line is cleared has its
+  interval ended and none opened, and the *In service without a subscription line* tile counts it.
+  An interval that has not started yet (it starts the day after an earlier move that day) has
+  billed no day: it is removed, not ended, so a move taken back the same day leaves the first
+  interval open as it was. The move takes the Asset's job lock as the opening and the closing do,
+  and reads the Asset afresh under it, so two such saves at once leave the interval at the line
+  and Site the Asset has. A move that cannot take the lock leaves it to the holder, and logs an
+  error if the interval is then still elsewhere. An interval the platform refuses to end is logged
+  as a warning, and no second one is opened beside it. A change of the Asset's company alone moves
+  nothing: an interval keeps the Customer it opened with.
 - The rule opens or reopens the interval under a job lock on the Asset (`LOCK.serviceInterval` in
   `domain/lock-names.ts`,
   ADR 0013), so two saves that put it in service at once (a Seen signal and the detection job) open
@@ -30,9 +53,27 @@
   workspace dashboard's *Billing integrity* tab, tile *In service on an ended line* (fleet assets in
   service or on a temporary deployment whose line is set ended or past its end date), and is never
   moved to another line.
-- The *Billing integrity* tab counts fleet assets only (ADR 0016): the Provider IT's equipment in use
-  shares `alm_hardware` and is never billed. Its tile *In service without a subscription line*
-  counts fleet assets in service with no Subscription line, which bill nothing.
+- Billing goes by a line's dates, not by its status: a line with no End date is still open. So a
+  Subscription line cannot be saved *Ended* without an End date, the last day it is billed. A
+  business rule refuses such a save, from a form, a list, an import or the Table API alike, and
+  asks for the date. It fills none in, since only whoever ends the line knows its last day. The
+  app's own ending of a site package sets both. A line saved *Ended* without an End date before
+  this rule keeps being billed until it is given one (*Ended subscription lines* in
+  `docs/verify-on-instance.md`).
+- The asset tiles of the *Billing integrity* tab count fleet assets only (ADR 0016): the Provider
+  IT's equipment in use shares `alm_hardware` and is never billed. Its tile *In service without a
+  subscription line* counts fleet assets in service or on a temporary deployment with no
+  Subscription line, which bill nothing. Go-live leaves a unit there when no open Subscription
+  line of its Agreement matches it.
+  *In service on a line not yet started* counts fleet assets in service or on a temporary
+  deployment whose Subscription line is still *Pending*. Generation bills no pending line, so they
+  bill nothing either. Go-live starts a pending line as it attaches a unit, so only a line set on
+  the Asset by hand leaves one there: move the unit to a line that runs. *Ended lines without an
+  end date* counts Subscription lines set *Ended* with no End date, which are billed every month
+  until each is given its last day. The rule above refuses new ones, and the tile finds those
+  saved before it or past it. Each of these two tiles opens the list of what it counts (*In
+  service on a line not yet started* under Billing, *Ended lines without an end date* under
+  Commercial), and both are offered to the roles that read Subscription lines.
 - Open **Fee events** up to the month end (lost, damaged, late return) are added once, each as its
   own line. A fee a *Regenerate* no longer bills (its date moved past the month end, or it fails
   to bill) leaves the period, so *Close period* does not mark it billed and a later month bills it.
@@ -123,13 +164,16 @@
   attaching it does not update the period, and a period that already has the file is skipped (delete
   it, then *Re-export CSV*, to rebuild it).
   Racing exports keep only the oldest copy; a failed export is logged as an error naming the period.
-- **Pull API** (finance or integration role):
+  A file the platform does not attach counts as failed: the platform reports that by returning no
+  attachment, with no error of its own.
+- **Pull API** (role `x_daas_ham.finance`, or `x_daas_ham.billing_reader`, the machine role of the
+  billing consumer; the NMS's `x_daas_ham.integration` is refused with HTTP 403):
   - `GET /api/x_daas_ham/naas/billing_periods` lists recent periods with status, line count and
     `totals`;
   - `GET /api/x_daas_ham/naas/billing_periods/{id}/lines?offset=<n>&limit=<n>` returns one page of
     lines (`PULL_PAGE` in `domain/billing.ts` holds the page sizes and their caps), each with its
     `currency`, and the period's `totals`; `final` is true once the period is
-    closed and `nextOffset` is null on the last page.
+    closed and `nextOffset` is null on the last page, also when that page is full.
   - `totals` is one entry per currency, in currency order: `{ "currency": "EUR", "lines": 12,
     "amount": 1234.56 }`, counted and summed from the period's lines (there is no single total: two
     currencies are never added).

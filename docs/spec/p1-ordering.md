@@ -4,7 +4,9 @@
 
 - Entry point: the record producer **Request network equipment** (service desk on the Customer's
   behalf in P1; the CSM portal in P2), or a draft Order created in the workspace and submitted with
-  **Submit**.
+  **Submit**. The producer is offered to the Order raisers below only (its user criterion *NaaS -
+  Order and Return raisers*). The platform also makes it *Not available for: SNC External*, which
+  keeps every Customer admin out until an admin removes that row (README "Install").
 - An Order has a Customer, Agreement, Site, order type (site rollout, device add, device replace,
   temporary deployment) and Install mode.
 - Lines come from the chosen Site template (its non-optional items, flagged *from site template*)
@@ -19,10 +21,21 @@
 - **Submit** on the Order form does nothing when the form's save is refused (the platform says why):
   it assesses nothing, asks no approvers and starts no sourcing from values the form did not save.
 - Through the record producer, an Order its requester may not raise is removed again (one the platform
-  keeps is logged, to cancel). One that names records not of its Customer stays a draft with its lines
-  (except those of a Site template not offered to the Customer), to correct and submit. So does one
+  keeps is logged, to cancel). Its answers to the producer's questions stay on the instance: the
+  platform's `question_answer` table lets no application delete from it. One that names records not
+  of its Customer stays a draft with its lines (except those of a Site template not offered to the
+  Customer), to correct and submit. So does one
   missing a line the platform refused: the user is told, and its work notes say, how many order lines
   were not saved, to add them and submit.
+- A Customer contact's Order is checked before it is saved, whatever inserts it: one that fails the
+  ownership rule above is refused with *Order not raised* and the reasons, and nothing is stored
+  (`platform/orders.ts` `contactOrderInsertRefusal`). A contact's insert by hand (a form, the Table
+  API) keeps no posted value, as they are an external user, and fails the Order create rule; the
+  check guards the record producer and any other insert that keeps the values. The record producer
+  runs it in its own script, before the insert (`entry/orders.ts` `beforeOrderProduced`): refused
+  there, the request stores none of its answers, which a refusal by the before-insert rule would
+  leave on the instance. So an Order that names records not of its Customer stays a draft only when
+  provider staff or the service desk raised it.
 
 ## Entitlement (`domain/entitlement.ts`)
 

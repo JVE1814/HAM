@@ -30,7 +30,7 @@ import { EVENT } from '../domain/events.ts'
 import { withLock, withLockTries } from './locks.ts'
 import { boolProperty, intProperty, stagingStockroom, stringProperty } from './properties.ts'
 import { PROPERTY } from '../domain/properties.ts'
-import { count, findById, refusal, str, warnRefused } from './records.ts'
+import { addWorkNote, count, findById, refusal, str, warnRefused } from './records.ts'
 import { restMessagePort } from './rest-messages.ts'
 import { log } from './log.ts'
 
@@ -194,7 +194,7 @@ export function labelReturn(returnOrder: GlideRecord): ReturnLabelOutcome {
     if (!label.ran) return { bought: false, why: 'A return label is already being bought for this return: reload it to see it' }
     const result = label.value
     if (!result.ok) return { bought: false, why: result.error }
-    returnOrder.setValue('work_notes', `Return label ${result.trackingNumber} (${result.carrier}): ${result.labelUrl}`)
+    addWorkNote(returnOrder, `Return label ${result.trackingNumber} (${result.carrier}): ${result.labelUrl}`)
     // The label and its Shipment are saved either way; only the note giving the Site contact the label link is lost.
     if (returnOrder.update()) return { bought: true, trackingNumber: result.trackingNumber }
     const where = `its link is on the Shipment (${result.labelUrl})`
@@ -254,7 +254,7 @@ export function voidLabel(shipmentId: string, trackingNumber: string): VoidOutco
     if ('why' in voiding) return notVoided(voiding.why)
     const returnOrder = findById('x_daas_ham_return_order', str(voiding.shipment, 'return_order'))
     if (returnOrder) {
-        returnOrder.setValue('work_notes', `Return label ${trackingNumber} voided with the carrier: do not ship on it.`)
+        addWorkNote(returnOrder, `Return label ${trackingNumber} voided with the carrier: do not ship on it.`)
         // The label is voided all the same; only the note telling the Site not to ship on it is lost.
         if (!returnOrder.update()) {
             const unnoted = `${str(returnOrder, 'number')} was not noted (${refusal(returnOrder)}): tell the Site not to ship on it`
@@ -293,7 +293,7 @@ function clearOrderTracking(orderId: string, label: LabelRef): VoidOutcome {
     if (!order || !note) return { voided: true, message: `Label ${label.trackingNumber} marked voided`, leftUndone: false }
     order.setValue('tracking_number', '')
     order.setValue('carrier', '')
-    order.setValue('work_notes', note)
+    addWorkNote(order, note)
     const number = str(order, 'number')
     if (!order.update()) {
         const left = `${number} still names it (${refusal(order)}): clear its tracking number and carrier by hand`
@@ -454,7 +454,7 @@ function noteDelivery(saved: Saved, trackingNumber: string): void {
     if (!saved.deliveredNow) return
     const order = findById('x_daas_ham_order', saved.orderId)
     if (!order) return
-    order.setValue('work_notes', `Delivered to ${order.getDisplayValue('site')} (${saved.carrier} ${trackingNumber}).`)
+    addWorkNote(order, `Delivered to ${order.getDisplayValue('site')} (${saved.carrier} ${trackingNumber}).`)
     // The delivery is on the Shipment; only the Order's note is lost.
     if (!order.update()) warnRefused(order, `${str(order, 'number')} not noted as delivered (${saved.carrier} ${trackingNumber})`)
 }

@@ -237,6 +237,9 @@ available | reserved | spare_pool | staging ─► in_transfer ─► available 
   uses a standard change; everything else uses a normal change.
 - If the tracking number, or the change and work order, cannot be saved on the Order, Ship still
   ships and says so; the Shipment, change (its *Parent*) and work order (its *Initiated from*) name the Order, to link them by hand.
+  The two are saved apart, the change and work order on the Order read again: a tracking number
+  the platform refused is not written by the later save, and does not keep that save from linking
+  the change and work order.
 - Ship runs one at a time per Order, under a job lock on it (`LOCK.shipOrder`), and reads the
   Order's tracking number and work order afresh. A Ship pressed while another of the same Order is
   running ships, buys and opens nothing and says another Ship is running. A Ship after it finds the
@@ -283,10 +286,18 @@ available | reserved | spare_pool | staging ─► in_transfer ─► available 
   - NMS events through `POST /api/x_daas_ham/naas/device_events`;
   - the Asset's CI `last_discovered`, read for pending Assets by the detection job (its interval is
     in `in-service/in-service.now.ts`).
-- An Asset is in service at the first sighting at or after its install completion. A temporary Order
-  gives a temporary deployment instead.
+- An Asset is in service from the first sighting at or after its install completion. A temporary
+  Order gives a temporary deployment instead. While it is pending in service the Asset keeps that
+  sighting (*First seen since install*, `x_daas_ham_first_seen`), so a go-live that is put off
+  (its Subscription line could not be started, below) still starts from it, whichever later
+  sighting or detection run completes it. Billing still starts no earlier than the line's start
+  date, a site package's as a per-device line's (`domain/billing.ts`). So when another unit's
+  go-live started the shared line on a later day first, this unit's days before that day are not
+  billed. A value from before the install completion (an Asset installed again) is passed over. For
+  a CI, the first sighting is the latest discovery the detection job read at its first run after
+  the install.
 - At that moment:
-  - the in-service date is set;
+  - the in-service date is set to that first sighting;
   - the Asset joins its Site's package line, or else the Agreement's line for its device class
     (one for its Site before one with no Site). A line whose end date is before the in-service date
     is passed over, even when it is not set ended, and one already started is chosen before one that
@@ -304,5 +315,8 @@ available | reserved | spare_pool | staging ─► in_transfer ─► available 
   (logged as an error), is
   not applied and is returned in `busy_identifiers`; the detection job leaves that Asset to its next
   run. A go-live whose save is refused after its Subscription line was started leaves the line
-  active: the sighting applied again joins it, its start date kept.
+  active: the sighting applied again joins it, its start date kept. That refused save stores
+  nothing on the Asset, its first sighting included. The NMS sends the event again with its own
+  time, but when a later sighting completes the go-live first, the in-service date is that later
+  sighting.
 - Device events store state changes only. They are purged after `x_daas_ham.events.retention_days`.

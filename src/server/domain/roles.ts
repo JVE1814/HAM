@@ -14,6 +14,7 @@ export const ROLE = {
     customerAdmin: 'x_daas_ham.customer_admin',
     siteContact: 'x_daas_ham.site_contact',
     integration: 'x_daas_ham.integration',
+    billingReader: 'x_daas_ham.billing_reader',
 } as const
 
 export type AppRole = (typeof ROLE)[keyof typeof ROLE]
@@ -40,6 +41,28 @@ export const PLATFORM_ROLE = {
  * Customer. The metadata's read lists are this list.
  */
 export const BROAD_STAFF = [ROLE.assetManager, ROLE.fieldTech, ROLE.noc, ROLE.accountManager, ROLE.finance]
+
+/**
+ * Who reads an Agreement's fields: BROAD_STAFF and the service desk. An Agreement extends ast_contract, and a field ACL
+ * on the Agreement table replaces ast_contract's for that field, so the Agreement's field ACLs name everyone who reads
+ * the field, the service desk included (ADR 0005). Written out, as the metadata cannot evaluate a spread.
+ */
+export const AGREEMENT_READERS = [ROLE.assetManager, ROLE.fieldTech, ROLE.noc, ROLE.accountManager, ROLE.finance, PLATFORM_ROLE.serviceDeskAgent]
+
+/**
+ * Who reads an Agreement's number, short description, state, starts and ends: AGREEMENT_READERS and Customer admins,
+ * whose sn_esm_user (through Customer Service's sn_customerservice.customer) ast_contract's ACLs for those fields admit.
+ * Written out, as the metadata cannot evaluate a spread.
+ */
+export const AGREEMENT_SUMMARY_READERS = [
+    ROLE.assetManager,
+    ROLE.fieldTech,
+    ROLE.noc,
+    ROLE.accountManager,
+    ROLE.finance,
+    PLATFORM_ROLE.serviceDeskAgent,
+    ROLE.customerAdmin,
+]
 
 /**
  * Every provider-staff role: who reads the installed base, and so opens an Asset's form (the rack page links a device

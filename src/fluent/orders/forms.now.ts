@@ -14,9 +14,9 @@ import {
 } from '@servicenow/sdk/core'
 import { DEVICE_CLASS, INSTALL_MODE_CHOICES, ORDER_TYPE_CHOICES } from '../../server/domain/vocabulary'
 import { NAAS_MODEL_CONDITION, SITES_OF_CUSTOMER_QUERY } from '../../server/domain/fleet'
-import { afterOrderProduced } from '../../server/entry/orders'
+import { afterOrderProduced, beforeOrderProduced } from '../../server/entry/orders'
 import { OPEN_ORDERS_QUERY } from '../../server/domain/fulfilment'
-import { orderRaisers, providerStaff } from '../shared/roles.now'
+import { orderRaisers, producerRequesters, providerStaff } from '../shared/roles.now'
 import { naasMenu } from '../shared/menu.now'
 
 Form({
@@ -141,6 +141,7 @@ export const requestNetworkEquipment = CatalogItemRecordProducer({
         'Choose a site template for a new site, add individual devices, or both. Orders within the customer agreement are fulfilled automatically; others go to the customer admin (and account manager) for approval.',
     table: 'x_daas_ham_order',
     catalogs: [SERVICE_CATALOG],
+    availableFor: [producerRequesters],
     redirectUrl: 'generatedRecord',
     variables: {
         customer: ReferenceVariable({
@@ -224,6 +225,7 @@ export const requestNetworkEquipment = CatalogItemRecordProducer({
         }),
     },
     variableSets: [{ variableSet: deviceRows, order: 1000 }],
+    script: beforeOrderProduced,
     postInsertScript: afterOrderProduced,
 })
 
